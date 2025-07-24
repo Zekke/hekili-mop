@@ -84,7 +84,7 @@ end)
 
 
 spec:RegisterResource( 1, {
-    -- MoP Stance-based rage generation
+    -- MoP Stance-based rage generation with improved mechanics
     battle_stance_regen = {
         aura = "battle_stance",
         last = function ()
@@ -94,8 +94,23 @@ spec:RegisterResource( 1, {
         end,
         interval = 1,
         value = function()
-            -- Battle Stance: Most rage from auto-attacking, none from taking damage
-            return state.buff.battle_stance.up and state.combat and 12 or 0
+            -- Battle Stance: Enhanced rage from auto-attacking, no rage from taking damage
+            if not state.buff.battle_stance.up or not state.combat then return 0 end
+            
+            local weapon_speed = state.main_hand.speed or 2.6
+            local base_rage = (3.5 / weapon_speed) * 2.5 -- Weapon speed formula
+            
+            -- Weapon specialization bonus
+            local spec_bonus = 1.0
+            if state.main_hand.type == "sword" and state.talent.sword_specialization.enabled then
+                spec_bonus = spec_bonus + 0.05 -- 5% more rage from swords
+            elseif state.main_hand.type == "mace" and state.talent.mace_specialization.enabled then
+                spec_bonus = spec_bonus + 0.05 -- 5% more rage from maces
+            elseif state.main_hand.type == "axe" and state.talent.axe_specialization.enabled then
+                spec_bonus = spec_bonus + 0.05 -- 5% more rage from axes
+            end
+            
+            return base_rage * spec_bonus
         end,
     },
     
@@ -108,10 +123,16 @@ spec:RegisterResource( 1, {
         end,
         interval = 1,
         value = function()
-            -- Berserker Stance: Rage from both auto-attacking and taking damage, but less from autos
-            local auto_rage = state.combat and 8 or 0 -- Less than Battle Stance
-            local damage_rage = state.combat and 4 or 0 -- Rage from taking damage
-            return state.buff.berserker_stance.up and (auto_rage + damage_rage) or 0
+            -- Berserker Stance: Reduced rage from auto-attacking but gets rage from taking damage
+            if not state.buff.berserker_stance.up or not state.combat then return 0 end
+            
+            local weapon_speed = state.main_hand.speed or 2.6
+            local auto_rage = (3.5 / weapon_speed) * 1.5 -- 60% of Battle Stance auto rage
+            
+            -- Damage taken rage (simulated - in real game this would be event-driven)
+            local damage_rage = state.incoming_damage_rate and (state.incoming_damage_rate * 0.1) or 2
+            
+            return auto_rage + damage_rage
         end,
     },
     
@@ -120,28 +141,32 @@ spec:RegisterResource( 1, {
         last = function ()
             local app = state.buff.defensive_stance.applied
             local t = state.query_time
-            return app + floor( ( t - app ) / 3 ) * 3 -- 3 second intervals
+            return app + floor( ( t - app ) / 3 ) * 3
         end,
         interval = 3,
         value = function()
-            -- Defensive Stance: 1 rage per 3 seconds in combat, none from autos/damage
-            return state.buff.defensive_stance.up and state.combat and 1 or 0
+            -- Defensive Stance: Minimal rage generation, only from taking damage
+            if not state.buff.defensive_stance.up or not state.combat then return 0 end
+            
+            -- Damage taken rage (reduced compared to Berserker)
+            local damage_rage = state.incoming_damage_rate and (state.incoming_damage_rate * 0.05) or 1
+            
+            return damage_rage
         end,
     },
     
     -- Mortal Strike rage generation (MoP: generates 10 rage instead of costing rage)
     mortal_strike_regen = {
-        channel = "mortal_strike",
         last = function ()
             return state.last_cast_time.mortal_strike or 0
         end,
-        interval = 1,
+        interval = 6, -- Mortal Strike cooldown
         value = function()
-            return 10 -- Mortal Strike generates 10 rage in MoP
+            return state.last_ability == "mortal_strike" and 10 or 0
         end,
     },
     
-    -- Berserker Rage rage generation
+    -- Berserker Rage rage generation (improved)
     berserker_rage = {
         aura = "berserker_rage",
         last = function ()
@@ -155,7 +180,7 @@ spec:RegisterResource( 1, {
         end,
     },
     
-    -- Deadly Calm rage efficiency
+    -- Deadly Calm rage efficiency (effectively rage generation)
     deadly_calm = {
         aura = "deadly_calm",
         last = function ()
@@ -165,44 +190,33 @@ spec:RegisterResource( 1, {
         end,
         interval = 1,
         value = function()
-            return state.buff.deadly_calm.up and 10 or 0 -- Abilities cost no rage during Deadly Calm
+            -- Abilities cost no rage during Deadly Calm (effective rage generation)
+            return state.buff.deadly_calm.up and 15 or 0
         end,
     },
     
     -- Charge rage generation (MoP: Juggernaut talent gives 15 rage per charge)
     charge_rage = {
-        channel = "charge",
         last = function ()
             return state.last_cast_time.charge or 0
         end,
-        interval = 1,
+        interval = 20, -- Charge cooldown
         value = function()
-            return state.talent.juggernaut.enabled and 15 or 0
+            return state.last_ability == "charge" and state.talent.juggernaut.enabled and 15 or 0
         end,
     },
-}, {
-    -- Enhanced base rage generation with MoP stance mechanics
-    base_regen = function ()
-        local base = 0
-        local weapon_bonus = 0
-        
-        -- Weapon speed affects rage generation from auto attacks
-        local weapon_speed = state.main_hand.speed or 2.6
-        weapon_bonus = state.combat and (3.5 / weapon_speed) * 2.5 or 0
-        
-        -- Stance-specific rage generation is handled above in individual auras
-        return base + weapon_bonus
-    end,
     
-    -- Unbridled Wrath rage generation
-    unbridled_wrath = function ()
-        return state.talent.unbridled_wrath.enabled and 1 or 0 -- Random rage generation from melee hits
-    end,
-    
-    -- Anger Management rage efficiency
-    anger_management = function ()
-        return state.talent.anger_management.enabled and 0.5 or 0 -- Slight rage efficiency bonus
-    end,
+    -- Victory Rush/Impending Victory rage generation
+    victory_rush_rage = {
+        last = function ()
+            return state.last_cast_time.victory_rush or state.last_cast_time.impending_victory or 0
+        end,
+        interval = 1,
+        value = function()
+            local last_victory = state.last_ability == "victory_rush" or state.last_ability == "impending_victory"
+            return last_victory and 5 or 0 -- 5 rage from Victory Rush abilities
+        end,
+    },
 } )
 
 -- Tier sets
@@ -294,7 +308,7 @@ spec:RegisterGear( "gorehowl", 105531, {
 -- Comprehensive Talent System (MoP Talent Trees)
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Mobility
-    juggernaut                 = { 1, 1, 103156 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
+    juggernaut                 = { 1, 1, 103826 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
     double_time                = { 1, 2, 103827 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and no longer generates Rage.
     warbringer                 = { 1, 3, 103828 }, -- Charge also roots the target for 4 sec, and Hamstring generates more Rage.
 
@@ -385,6 +399,23 @@ spec:RegisterAuras( {
         id = 86346,
         duration = 6,
         max_stack = 1,
+        generate = function( t )
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitDebuffByID( "target", 86346 )
+            
+            if name then
+                t.name = name
+                t.count = count or 1
+                t.expires = expirationTime
+                t.applied = expirationTime - duration
+                t.caster = caster
+                return
+            end
+            
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end
     },
     mortal_strike_debuff = {
         id = 12294,
@@ -561,34 +592,17 @@ spec:RegisterAuras( {
         tick_time = 3,  -- WoW Sims: 3 second intervals
         max_stack = 1,
     },
+    -- Arms signature: Colossus Smash damage window
+    colossus_smash_window = {
+        id = 86346, -- Same spell ID, but this is the player buff for damage calculations
+        duration = 6,
+        max_stack = 1,
+    },
 } )
 
 -- Advanced Aura System with Generate Functions (following Hunter Survival pattern)
 spec:RegisterAuras( {
     -- Arms-specific Auras
-    colossus_smash = {
-        id = 86346,
-        duration = 6,
-        max_stack = 1,
-        generate = function( t )
-            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitDebuffByID( "target", 86346 )
-            
-            if name then
-                t.name = name
-                t.count = count or 1
-                t.expires = expirationTime
-                t.applied = expirationTime - duration
-                t.caster = caster
-                return
-            end
-            
-            t.count = 0
-            t.expires = 0
-            t.applied = 0
-            t.caster = "nobody"
-        end
-    },
-    
     mortal_strike = {
         id = 12294,
         duration = 10,
@@ -1124,17 +1138,23 @@ spec:RegisterAbilities( {
         cooldown = 20,
         gcd = "spell",
         
-        spend = 20,  -- WoW Sims: 20 rage cost
+        spend = 20,  -- MoP: 20 rage cost
         spendType = "rage",
         
         startsCombat = true,
         texture = 464973,
         
         handler = function()
-            applyDebuff( "target", "colossus_smash" )
+            -- Apply the signature Colossus Smash debuff (6 seconds, ignores armor)
+            applyDebuff( "target", "colossus_smash", 6 )
+            
+            -- MoP: Colossus Smash provides a damage window
             if glyph.colossus_smash.enabled then
-                applyBuff( "enrage" )
+                applyBuff( "berserker_stance", 15 ) -- Glyph grants Berserker Stance benefits
             end
+            
+            -- Arms signature: Enhanced damage during Colossus Smash window
+            applyBuff( "colossus_smash_window", 6 ) -- Player buff for damage calculations
         end,
     },    execute = {
         id = 5308,
@@ -1233,14 +1253,32 @@ spec:RegisterAbilities( {
         cooldown = 0,
         gcd = "spell",
         
-        spend = 0,
+        spend = function() 
+            -- MoP: Battle Shout generates rage when used
+            return -10 
+        end,
         spendType = "rage",
         
         startsCombat = false,
         texture = 132333,
         
         handler = function()
-            applyBuff( "battle_shout" )
+            -- Apply Battle Shout buff (increases attack power)
+            applyBuff( "battle_shout", 300 ) -- 5 minute duration in MoP
+            
+            -- MoP: Battle Shout generates rage
+            gain( 10, "rage" )
+            
+            -- Glyph of Battle: Additional health bonus
+            if glyph.battle.enabled then
+                applyBuff( "battle_shout_health", 3600 ) -- 1 hour health bonus
+            end
+            
+            -- Improved shouts from talents would affect party/raid here
+            if talent.commanding_presence.enabled then
+                -- Enhanced buff duration and effects
+                buff.battle_shout.duration = 450 -- 7.5 minutes with talent
+            end
         end,
     },
     
@@ -1250,14 +1288,32 @@ spec:RegisterAbilities( {
         cooldown = 0,
         gcd = "spell",
         
-        spend = 0,
+        spend = function()
+            -- MoP: Commanding Shout also generates rage when used
+            return -10
+        end,
         spendType = "rage",
         
         startsCombat = false,
         texture = 132351,
         
         handler = function()
-            applyBuff( "commanding_shout" )
+            -- Apply Commanding Shout buff (increases stamina)
+            applyBuff( "commanding_shout", 300 ) -- 5 minute duration in MoP
+            
+            -- MoP: Commanding Shout generates rage
+            gain( 10, "rage" )
+            
+            -- Enhanced effects with talents
+            if talent.commanding_presence.enabled then
+                buff.commanding_shout.duration = 450 -- 7.5 minutes with talent
+            end
+            
+            -- Glyph of Rallying Cry synergy
+            if glyph.rallying_cry.enabled then
+                -- Commanding Shout provides additional health benefit
+                applyBuff( "commanding_shout_health", 300 )
+            end
         end,
     },
       sweeping_strikes = {
@@ -1775,6 +1831,91 @@ spec:RegisterAbilities( {
         startsCombat = true,
         handler = function()
             -- Auto attack handled by game
+        end,
+    },
+    
+    -- Stance switching abilities (core MoP mechanic)
+    battle_stance = {
+        id = 2457,
+        cast = 0,
+        cooldown = 1.5, -- MoP: 1.5 second GCD for stance switching
+        gcd = "spell",
+        
+        spend = 0,
+        spendType = "rage",
+        
+        startsCombat = false,
+        texture = 132349,
+        
+        usable = function() return not buff.battle_stance.up end,
+        
+        handler = function()
+            -- Remove other stances
+            removeBuff( "defensive_stance" )
+            removeBuff( "berserker_stance" )
+            
+            -- Apply Battle Stance
+            applyBuff( "battle_stance" )
+            
+            -- MoP: Stance switching incurs rage loss
+            local rage_loss = rage.current * 0.25 -- Lose 25% of current rage
+            spend( rage_loss, "rage" )
+        end,
+    },
+    
+    defensive_stance = {
+        id = 71,
+        cast = 0,
+        cooldown = 1.5,
+        gcd = "spell",
+        
+        spend = 0,
+        spendType = "rage",
+        
+        startsCombat = false,
+        texture = 132341,
+        
+        usable = function() return not buff.defensive_stance.up end,
+        
+        handler = function()
+            -- Remove other stances
+            removeBuff( "battle_stance" )
+            removeBuff( "berserker_stance" )
+            
+            -- Apply Defensive Stance
+            applyBuff( "defensive_stance" )
+            
+            -- MoP: Stance switching incurs rage loss
+            local rage_loss = rage.current * 0.25
+            spend( rage_loss, "rage" )
+        end,
+    },
+    
+    berserker_stance = {
+        id = 2458,
+        cast = 0,
+        cooldown = 1.5,
+        gcd = "spell",
+        
+        spend = 0,
+        spendType = "rage",
+        
+        startsCombat = false,
+        texture = 132275,
+        
+        usable = function() return not buff.berserker_stance.up end,
+        
+        handler = function()
+            -- Remove other stances
+            removeBuff( "battle_stance" )
+            removeBuff( "defensive_stance" )
+            
+            -- Apply Berserker Stance
+            applyBuff( "berserker_stance" )
+            
+            -- MoP: Stance switching incurs rage loss
+            local rage_loss = rage.current * 0.25
+            spend( rage_loss, "rage" )
         end,
     },
     

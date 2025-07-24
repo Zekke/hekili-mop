@@ -59,7 +59,7 @@ spec:RegisterGear( "tier15", 95290, 95292, 95288, 95291, 95289 ) -- T15 Holy Pal
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Movement
     speed_of_light            = { 1, 1, 85499 }, -- +70% movement speed for 8 sec
-    long_arm_of_the_law       = { 1, 2, 114158 }, -- Judgments increase movement speed by 45% for 3 sec
+    long_arm_of_the_law       = { 1, 2, 87172 }, -- Judgments increase movement speed by 45% for 3 sec
     pursuit_of_justice        = { 1, 3, 26023 }, -- +15% movement speed per Holy Power charge
 
     -- Tier 2 (Level 30) - Control

@@ -207,33 +207,33 @@ spec:RegisterHook( "spend", spendHook )
 spec:RegisterTalents( {
     -- Tier 1 (Level 56)
     roiling_blood             = { 1, 1, 108170 }, -- Your Pestilence refreshes disease durations and spreads diseases from each diseased target to all other targets.
-    unholy_presence           = { 1, 2,  48265 }, -- The presence of the Unholy, increasing attack speed by 15% and movement speed by 15%.
-    plague_leech              = { 1, 3, 123693 }, -- Extract diseases from an enemy target, consuming up to 2 diseases on the target to gain 1 Rune of each type that was removed.
+    plague_leech              = { 1, 2, 123693 }, -- Extract diseases from an enemy target, consuming up to 2 diseases on the target to gain 1 Rune of each type that was removed.
+    unholy_blight             = { 1, 3, 115989 }, -- Causes you to spread your diseases to all enemy targets within 10 yards.
 
     -- Tier 2 (Level 57)
     lichborne                 = { 2, 1,  49039 }, -- Draw upon unholy energy to become undead for 10 sec. While undead, you are immune to Charm, Fear, and Sleep effects.
-    antimagic_zone            = { 2, 2,  51052 }, -- Places a large, stationary Anti-Magic Zone that reduces spell damage taken by party or raid members by 40%. The Anti-Magic Zone lasts for 30 sec or until it absorbs a massive amount of spell damage.
+    anti_magic_zone           = { 2, 2,  51052 }, -- Places a large, stationary Anti-Magic Zone that reduces spell damage taken by party or raid members by 40%. The Anti-Magic Zone lasts for 30 sec or until it absorbs a massive amount of spell damage.
     purgatory                 = { 2, 3, 114556 }, -- An unholy pact that prevents fatal damage, instead absorbing incoming healing equal to the damage that would have been fatal for 3 sec.
 
     -- Tier 3 (Level 58)
-    deaths_embrace            = { 3, 1, 108839 }, -- Your healing done is increased by 25% and damage taken is reduced by 15% when below 20% health.
-    corpse_explosion          = { 3, 2, 127344 }, -- Target a corpse within 30 yards. After 4 sec, the corpse will explode for Shadow damage split among all nearby enemies.
-    resilient_infection       = { 3, 3, 132797 }, -- When your diseases are dispelled, you have a 90% chance to not lose a charge of the disease.
+    deaths_advance            = { 3, 1,  96268 }, -- For 8 sec, you are immune to movement impairing effects and your movement speed is increased by 50%.
+    chilblains                = { 3, 2,  50041 }, -- Victims of your Chains of Ice take 5% increased damage from your abilities for 8 sec.
+    asphyxiate                = { 3, 3, 108194 }, -- Lifts the enemy target off the ground, crushing their throat and stunning them for 5 sec.
 
     -- Tier 4 (Level 60)
-    deaths_advance            = { 4, 1,  96268 }, -- For 8 sec, you are immune to movement impairing effects and your movement speed is increased by 50%.
-    chilblains                = { 4, 2,  50041 }, -- Victims of your Chains of Ice take 5% increased damage from your abilities for 8 sec.
-    asphyxiate                = { 4, 3, 108194 }, -- Lifts the enemy target off the ground, crushing their throat and stunning them for 5 sec.
+    death_pact                = { 4, 1,  48743 }, -- Drains 50% of your summoned minion's health to heal you for 25% of your maximum health.
+    death_siphon              = { 4, 2, 108196 }, -- Deals Shadow damage to the target and heals you for 150% of the damage dealt.
+    conversion                = { 4, 3, 119975 }, -- Continuously converts 2% of your maximum health per second into 20% of maximum health as healing.
 
     -- Tier 5 (Level 75)
-    death_pact                = { 5, 1,  48743 }, -- Drains 50% of your summoned minion's health to heal you for 25% of your maximum health.
-    death_siphon              = { 5, 2, 108196 }, -- Deals Shadow damage to the target and heals you for 150% of the damage dealt.
-    vampiric_aura             = { 5, 3, 108205 }, -- You and your minions gain 15% Leech.
+    blood_tap                 = { 5, 1,  45529 }, -- Consume 5 charges from your Blood Charges to immediately activate a random depleted rune.
+    runic_empowerment         = { 5, 2,  81229 }, -- When you use a rune, you have a 45% chance to immediately regenerate that rune.
+    runic_corruption          = { 5, 3,  51462 }, -- When you hit with a Death Coil, Frost Strike, or Rune Strike, you have a 45% chance to regenerate a rune.
 
     -- Tier 6 (Level 90)
-    remorseless_winter        = { 6, 1, 108200 }, -- Surrounds the Death Knight with a swirling blizzard that grows over 8 sec, slowing enemies by up to 50% and reducing their melee and ranged attack speed by up to 20%.
-    gorefiends_grasp          = { 6, 2, 108199 }, -- Shadowy tendrils coil around all enemies within 20 yards of a hostile target, pulling them to the target's location.
-    desecrated_ground         = { 6, 3, 118009 }, -- Corrupts the ground beneath you, causing all nearby enemies to deal 10% less damage for 30 sec.
+    gorefiends_grasp          = { 6, 1, 108199 }, -- Shadowy tendrils coil around all enemies within 20 yards of a hostile target, pulling them to the target's location.
+    remorseless_winter        = { 6, 2, 108200 }, -- Surrounds the Death Knight with a swirling blizzard that grows over 8 sec, slowing enemies by up to 50% and reducing their melee and ranged attack speed by up to 20%.
+    desecrated_ground         = { 6, 3, 108201 }, -- Corrupts the ground beneath you, causing all nearby enemies to deal 10% less damage for 30 sec.
 } )
 
 -- Glyphs (Enhanced System - authentic MoP 5.4.8 glyph system)

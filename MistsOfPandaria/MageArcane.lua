@@ -62,10 +62,28 @@ arcaneCombatLogFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 RegisterArcaneCombatLogEvent("SPELL_CAST_SUCCESS", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool)
     if spellID == 5143 then -- Arcane Missiles
         -- Arcane Missiles consumes all Arcane Charges
+        if buff.arcane_charge.up then
+            removeBuff( "arcane_charge" )
+        end
     elseif spellID == 30451 then -- Arcane Blast
-        -- Arcane Blast generates Arcane Charges
+        -- Arcane Blast generates Arcane Charges (max 4)
+        if not buff.arcane_charge.up then
+            applyBuff( "arcane_charge", nil, 1 )
+        elseif buff.arcane_charge.stack < 4 then
+            addStack( "arcane_charge", nil, 1 )
+        end
     elseif spellID == 44425 then -- Arcane Barrage
         -- Arcane Barrage consumes all Arcane Charges for instant cast
+        if buff.arcane_charge.up then
+            removeBuff( "arcane_charge" )
+        end
+    elseif spellID == 1449 then -- Arcane Explosion
+        -- Arcane Explosion generates Arcane Charges (max 4)
+        if not buff.arcane_charge.up then
+            applyBuff( "arcane_charge", nil, 1 )
+        elseif buff.arcane_charge.stack < 4 then
+            addStack( "arcane_charge", nil, 1 )
+        end
     end
 end)
 
@@ -327,6 +345,19 @@ spec:RegisterTalents( {
     rune_of_power         = { 6, 2, 116011 }, -- Ground rune increases spell damage by 15%
     incanter_s_ward       = { 6, 3, 1463 }, -- Converts 30% damage taken to mana
 } )
+
+-- Spell Power Calculations and State Expressions
+spec:RegisterStateExpr( "spell_power", function()
+    return GetSpellBonusDamage(6) -- Arcane school
+end )
+
+spec:RegisterStateExpr( "arcane_power_bonus", function()
+    return buff.arcane_power.up and 0.3 or 0 -- 30% damage bonus
+end )
+
+spec:RegisterStateExpr( "arcane_charge_bonus", function()
+    return buff.arcane_charge.up and (buff.arcane_charge.stack * 0.25) or 0 -- 25% per charge
+end )
 
 -- Enhanced Tier Sets with comprehensive bonuses
 spec:RegisterGear( 13, 8, { -- Tier 14 (Heart of Fear)
@@ -995,6 +1026,30 @@ spec:RegisterAuras( {
         end
     },
     
+    -- Arcane Charge system
+    arcane_charge = {
+        id = 36032,
+        duration = 10,
+        max_stack = 4,
+        generate = function( t )
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID( "player", 36032 )
+            
+            if name then
+                t.name = name
+                t.count = count > 0 and count or 1
+                t.expires = expirationTime
+                t.applied = expirationTime - duration
+                t.caster = caster
+                return
+            end
+            
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end
+    },
+    
     -- Shared Mage Auras (Basic Tracking)
     arcane_brilliance = {
         id = 1459,
@@ -1173,6 +1228,10 @@ spec:RegisterAbilities( {
         
         handler = function()
             removeBuff( "arcane_missiles" )
+            -- Consume all Arcane Charges when cast
+            if buff.arcane_charge.up then
+                removeBuff( "arcane_charge" )
+            end
         end,
     },
     
@@ -1223,8 +1282,10 @@ spec:RegisterAbilities( {
         texture = 136116,
         
         handler = function()
-            -- Add Arcane Charge (max 4 stacks per WoW Sims)
-            if buff.arcane_charge.stack < 4 then
+            -- Add Arcane Charge (max 4 stacks)
+            if not buff.arcane_charge.up then
+                applyBuff( "arcane_charge", nil, 1 )
+            elseif buff.arcane_charge.stack < 4 then
                 addStack( "arcane_charge", nil, 1 )
             end
         end,

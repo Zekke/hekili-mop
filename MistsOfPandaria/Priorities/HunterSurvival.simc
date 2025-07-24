@@ -39,8 +39,9 @@ actions+=/glaive_toss,if=talent.glaive_toss.enabled&cooldown.glaive_toss.ready&f
 # 10. Arcane Shot (when focus >= 55 or Thrill of the Hunt is active)
 actions+=/arcane_shot,if=(focus>=55|buff.thrill_of_the_hunt.up)&target.time_to_die>6
 
-# 11. Cobra Shot (filler to generate focus, which will also maintain Serpent Sting)
-actions+=/cobra_shot
+# 11. Optimal shot rotation using state expressions
+actions+=/cobra_shot,if=should_cobra_shot&focus>=14
+actions+=/steady_shot,if=should_steady_shot&focus>=14
 
 
 # 13. Defensive and Utility - BOTTOM PRIORITY
@@ -56,7 +57,8 @@ actions.burst+=/rapid_fire,if=cooldown.rapid_fire.ready
 actions.burst+=/kill_shot,if=target.health.pct<=20
 actions.burst+=/black_arrow,if=!debuff.black_arrow.up&focus>=35&target.time_to_die>=8
 actions.burst+=/arcane_shot,if=(focus>=55|buff.thrill_of_the_hunt.up)&target.time_to_die>6
-actions.burst+=/cobra_shot
+actions.burst+=/cobra_shot,if=should_cobra_shot&focus>=14
+actions.burst+=/steady_shot,if=should_steady_shot&focus>=14
 
 # ASPECT MANAGEMENT
 actions.aspects+=/aspect_of_the_hawk,if=!buff.aspect_of_the_hawk.up&!talent.aspect_of_the_iron_hawk.enabled
@@ -95,4 +97,5 @@ actions.aoe+=/explosive_shot,if=buff.lock_and_load.up&lock_and_load_shots>0
 actions.aoe+=/serpent_sting,if=!debuff.serpent_sting.up&target.time_to_die>15
 actions.aoe+=/explosive_shot,if=focus>=40
 actions.aoe+=/multi_shot,if=focus>=50
-actions.aoe+=/cobra_shot
+actions.aoe+=/cobra_shot,if=should_cobra_shot&focus>=14
+actions.aoe+=/steady_shot,if=should_steady_shot&focus>=14

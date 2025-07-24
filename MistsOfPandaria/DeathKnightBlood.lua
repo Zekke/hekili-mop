@@ -349,35 +349,35 @@ spec:RegisterGear( "armageddon", 105531, {
 -- Talents (MoP talent system and Blood spec-specific talents)
 spec:RegisterTalents( {
     -- Common MoP talent system (Tier 1-6)
-    -- Tier 1 (Level 56) - Presence
-    blood_presence           = { 1, 1, 48263 }, -- Increases armor by 25%, damage reduction by 8%, and threat generation.
-    frost_presence           = { 1, 2, 48266 }, -- Increases runic power generation by 20% and movement speed by 15%.
-    unholy_presence          = { 1, 3, 48265 }, -- Increases attack speed by 15% and rune regeneration by 15%.
+    -- Tier 1 (Level 56)
+    roiling_blood            = { 1, 1, 108170 }, -- Your Pestilence refreshes disease durations and spreads diseases from each diseased target to all other targets.
+    plague_leech             = { 1, 2, 123693 }, -- Extract diseases from an enemy target, consuming up to 2 diseases on the target to gain 1 Rune of each type that was removed.
+    unholy_blight            = { 1, 3, 115989 }, -- Causes you to spread your diseases to all enemy targets within 10 yards.
     
-    -- Tier 2 (Level 57) - Survival
-    lichborne                = { 2, 1  , 49039 }, -- Draw upon unholy energy to become undead for 10 sec, immune to charm, fear, and sleep effects.
+    -- Tier 2 (Level 57)
+    lichborne                = { 2, 1, 49039 }, -- Draw upon unholy energy to become undead for 10 sec, immune to charm, fear, and sleep effects.
     anti_magic_zone          = { 2, 2, 51052 }, -- Places an Anti-Magic Zone that reduces spell damage taken by party members by 40%.
     purgatory                = { 2, 3, 114556 }, -- An unholy pact that prevents fatal damage, instead absorbing incoming healing.
     
-    -- Tier 3 (Level 58) - Utility
+    -- Tier 3 (Level 58)
     deaths_advance           = { 3, 1, 96268 }, -- For 8 sec, you are immune to movement impairing effects and take 50% less damage from area of effect abilities.
     chilblains               = { 3, 2, 50041 }, -- Victims of your Chains of Ice, Howling Blast, or Remorseless Winter are Chilblained, reducing movement speed by 50% for 10 sec.
-    asphyxiate              = { 3, 3, 108194 }, -- Lifts an enemy target off the ground and crushes their throat, silencing them for 5 sec.
+    asphyxiate               = { 3, 3, 108194 }, -- Lifts an enemy target off the ground and crushes their throat, silencing them for 5 sec.
     
-    -- Tier 4 (Level 59) - Healing
+    -- Tier 4 (Level 60)
     death_pact               = { 4, 1, 48743 }, -- Sacrifice your ghoul to heal yourself for 20% of your maximum health.
     death_siphon             = { 4, 2, 108196 }, -- Inflicts Shadow damage to target enemy and heals you for 100% of the damage done.
     conversion               = { 4, 3, 119975 }, -- Continuously converts 2% of your maximum health per second into 20% of maximum health as healing.
     
-    -- Tier 5 (Level 60) - Rune Management
+    -- Tier 5 (Level 75)
     blood_tap                = { 5, 1, 45529 }, -- Consume 5 charges from your Blood Charges to immediately activate a random depleted rune.
     runic_empowerment        = { 5, 2, 81229 }, -- When you use a rune, you have a 45% chance to immediately regenerate that rune.
-    runic_corruption         = { 5, 3, 51460 }, -- When you hit with a Death Coil, Frost Strike, or Rune Strike, you have a 45% chance to regenerate a rune.
+    runic_corruption         = { 5, 3, 51462 }, -- When you hit with a Death Coil, Frost Strike, or Rune Strike, you have a 45% chance to regenerate a rune.
     
-    -- Tier 6 (Level 75) - Ultimate
-    soul_reaper              = { 6, 1, 130735 }, -- Strike an enemy, dealing minor damage but cursing the target for 5 sec. If the target is below 35% health after 5 sec, they explode for massive damage.
-    desecrated_ground        = { 6, 2, 118009 }, -- Corrupts the ground targeted by the Death Knight for 30 sec. While standing on this ground you are immune to effects that cause loss of control.
-    defile                   = { 6, 3, 152280 }  -- Defiles the ground under the target location, dealing increasing damage to enemies that remain in the area.
+    -- Tier 6 (Level 90)
+    gorefiends_grasp         = { 6, 1, 108199 }, -- Shadowy tendrils coil around all enemies within 20 yards of a hostile target, pulling them to the target's location.
+    remorseless_winter       = { 6, 2, 108200 }, -- Surrounds the Death Knight with a swirling blizzard that grows over 8 sec, slowing enemies by up to 50% and reducing their melee and ranged attack speed by up to 20%.
+    desecrated_ground        = { 6, 3, 108201 }, -- Corrupts the ground targeted by the Death Knight for 30 sec. While standing on this ground you are immune to effects that cause loss of control.
 } )
 
 -- Glyphs

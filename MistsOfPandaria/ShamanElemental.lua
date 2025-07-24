@@ -22,15 +22,102 @@ local function InitializeSpec()
     
     local spec = Hekili:NewSpecialization( 262 )
 
--- Resources
-spec:RegisterResource( 0 ) -- Mana = 0 in MoP
+-- Enhanced Mana resource system for Elemental Shaman
+spec:RegisterResource( 0, { -- Mana = 0 in MoP
+    -- Water Shield mana restoration (Elemental gets better benefit than Enhancement)
+    water_shield = {
+        aura = "water_shield",
+        last = function ()
+            local app = state.buff.water_shield.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 3 ) * 3
+        end,
+        interval = 3, -- Water Shield orb consumption
+        value = function ()
+            if not state.buff.water_shield.up then return 0 end
+            -- Elemental gets 5% max mana per orb (higher than Enhancement)
+            local base_restoration = state.mana.max * 0.05
+            
+            -- Glyph of Water Shield enhancement
+            if state.glyph.water_shield.enabled then
+                base_restoration = base_restoration * 1.2 -- 20% bonus
+            end
+            
+            return base_restoration
+        end,
+    },
+    
+    -- Thunderstorm mana restoration (Elemental signature ability)
+    thunderstorm_regen = {
+        last = function ()
+            return state.last_cast_time.thunderstorm or 0
+        end,
+        interval = 45, -- Thunderstorm cooldown
+        value = function()
+            -- Thunderstorm restores 8% mana in MoP for Elemental
+            return state.last_ability == "thunderstorm" and state.mana.max * 0.08 or 0
+        end,
+    },
+    
+    -- Elemental Focus mana efficiency (when clearcasting)
+    elemental_focus = {
+        aura = "clearcasting",
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Clearcasting makes next spell cost no mana (effective restoration)
+            return state.buff.clearcasting.up and state.mana.max * 0.06 or 0 -- Avg spell cost
+        end,
+    },
+    
+    -- Telluric Currents mana return from Lightning Bolt on low health targets
+    telluric_currents = {
+        last = function ()
+            return state.last_cast_time.lightning_bolt or 0
+        end,
+        interval = 1,
+        value = function()
+            if state.talent.telluric_currents.enabled and state.last_ability == "lightning_bolt" and state.target.health.pct < 25 then
+                -- Telluric Currents returns 40% of Lightning Bolt cost as mana
+                return state.mana.max * 0.024 -- 6% spell cost * 40% return
+            end
+            return 0
+        end,
+    },
+}, {
+    -- Enhanced base mana regeneration for Elemental
+    base_regen = function ()
+        local base = state.mana.max * 0.02 -- 2% max mana per 5 seconds base
+        local spirit_bonus = (state.stat.spirit or 0) * 0.5 -- Spirit contribution
+        local meditation_bonus = 1.0
+        
+        -- Meditation allows 50% regen while casting
+        if state.talent.meditation.enabled and state.casting then
+            meditation_bonus = 0.5
+        end
+        
+        -- Mana Spring Totem bonus (if active)
+        if state.buff.mana_spring_totem.up then
+            base = base * 1.25 -- 25% bonus
+        end
+        
+        return (base + spirit_bonus) * meditation_bonus / 5 -- Convert to per-second
+    end,
+    
+    -- Unrelenting Storm mana bonus from critical strikes
+    unrelenting_storm = function ()
+        return state.talent.unrelenting_storm.enabled and 1 or 0 -- Random mana bonus from crits
+    end,
+} )
 
 -- Talents (MoP Elemental Shaman talents)
 spec:RegisterTalents( {
     -- Tier 15
-    astral_shift = { 1, 1, 108271 },
+    nature_guardian = { 1, 1, 30884 },
     stone_bulwark_totem = { 1, 2, 108270 },
-    elemental_blast = { 1, 3, 117014 },
+    astral_shift = { 1, 3, 108271 },
     
     -- Tier 30
     frozen_power = { 2, 1, 63374 },
@@ -53,9 +140,9 @@ spec:RegisterTalents( {
     echo_of_the_elements = { 5, 3, 108283 },
     
     -- Tier 90
-    elemental_mastery = { 6, 1, 16166 },
-    ancestral_guidance = { 6, 2, 108281 },
-    primal_elementalist = { 6, 3, 117013 },
+    unleashed_fury = { 6, 1, 117012 },
+    primal_elementalist = { 6, 2, 117013 },
+    elemental_blast = { 6, 3, 117014 },
 } )
 
 -- Glyphs (Enhanced System - authentic MoP 5.4.8 glyph system)

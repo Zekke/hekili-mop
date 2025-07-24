@@ -59,6 +59,34 @@ end
 
 destructionCombatLogFrame:SetScript("OnEvent", HandleDestructionCombatLogEvent)
 
+-- Pet management system for Destruction Warlock
+local function summon_demon(demon_type)
+    -- Track which demon is active
+    if demon_type == "imp" then
+        applyBuff("grimoire_of_sacrifice_imp")
+    elseif demon_type == "voidwalker" then
+        applyBuff("grimoire_of_sacrifice_voidwalker")
+    elseif demon_type == "succubus" then
+        applyBuff("grimoire_of_sacrifice_succubus")
+    elseif demon_type == "felhunter" then
+        applyBuff("grimoire_of_sacrifice_felhunter")
+    elseif demon_type == "felguard" then
+        applyBuff("grimoire_of_sacrifice_felguard")
+    end
+end
+
+-- Pet stat tracking for Destruction
+local function update_pet_stats()
+    local pet_health = UnitHealth("pet") or 0
+    local pet_max_health = UnitHealthMax("pet") or 1
+    local pet_health_pct = pet_health / pet_max_health
+    
+    -- Update pet health state for Dark Pact calculations
+    if state then
+        state.pet_health_pct = pet_health_pct
+    end
+end
+
 -- Burning Ember generation from Immolate/Conflagrate ticks
 RegisterDestructionCombatLogEvent("SPELL_PERIODIC_DAMAGE", function(timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing)
     if sourceGUID == UnitGUID("player") then
@@ -132,9 +160,132 @@ RegisterDestructionCombatLogEvent("SPELL_AURA_APPLIED", function(timestamp, even
 end)
 
 -- Enhanced Resource Management Systems
-spec:RegisterResource( 0 ) -- Mana = 0 in MoP
+spec:RegisterResource( 0, {
+    -- Life Tap mana restoration (Warlock signature mechanic)
+    life_tap = {
+        last = function ()
+            return state.last_cast_time.life_tap or 0
+        end,
+        interval = 1.5, -- Life Tap GCD
+        value = function()
+            -- Life Tap converts health to mana (30% max mana in MoP)
+            return state.last_ability == "life_tap" and state.mana.max * 0.30 or 0
+        end,
+    },
+    
+    -- Dark Pact mana return (from demon health)
+    dark_pact = {
+        last = function ()
+            return state.last_cast_time.dark_pact or 0
+        end,
+        interval = 1.5, -- Dark Pact GCD
+        value = function()
+            -- Dark Pact converts demon health to mana
+            return state.last_ability == "dark_pact" and state.mana.max * 0.25 or 0
+        end,
+    },
+}, {
+    -- Base mana regeneration for Destruction
+    base_regen = function ()
+        local base = state.mana.max * 0.01 -- 1% base (Warlocks have low base regen)
+        local spirit_bonus = (state.stat.spirit or 0) * 0.4 -- Spirit is less effective for Warlocks
+        
+        -- Fel Armor bonus to mana regeneration
+        if state.buff.fel_armor.up then
+            base = base * 1.20 -- 20% bonus
+        end
+        
+        return (base + spirit_bonus) / 5 -- Convert to per-second
+    end,
+    
+    -- Improved Life Tap talent bonus
+    improved_life_tap = function ()
+        return state.talent.improved_life_tap.enabled and 0.2 or 0 -- 20% spell power as mana efficiency
+    end,
+} )
 
-spec:RegisterResource( 14 ) -- BurningEmbers = 14 in MoP
+spec:RegisterResource( 14, {
+    -- Burning Ember generation from Immolate ticks
+    immolate_generation = {
+        last = function ()
+            return state.last_immolate_tick or 0
+        end,
+        interval = 2, -- Immolate tick interval
+        value = function()
+            -- Immolate generates 0.1 Burning Ember per tick
+            local embers_generated = 0.1
+            if state.debuff.immolate.up then
+                -- Critical ticks generate more embers
+                if state.last_critical_tick then
+                    embers_generated = embers_generated + 0.1
+                end
+                return embers_generated
+            end
+            return 0
+        end,
+    },
+    
+    -- Conflagrate Burning Ember generation
+    conflagrate_generation = {
+        last = function ()
+            return state.last_cast_time.conflagrate or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Conflagrate generates 0.2 Burning Embers
+            return state.last_ability == "conflagrate" and 0.2 or 0
+        end,
+    },
+    
+    -- Incinerate Burning Ember generation
+    incinerate_generation = {
+        last = function ()
+            return state.last_cast_time.incinerate or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Incinerate generates 0.1 Burning Ember per cast
+            return state.last_ability == "incinerate" and 0.1 or 0
+        end,
+    },
+    
+    -- Chaos Bolt Burning Ember consumption
+    chaos_bolt_consumption = {
+        last = function ()
+            return state.last_cast_time.chaos_bolt or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Chaos Bolt consumes 4 Burning Embers
+            return state.last_ability == "chaos_bolt" and -4 or 0
+        end,
+    },
+    
+    -- Ember Tap Burning Ember consumption
+    ember_tap_consumption = {
+        last = function ()
+            return state.last_cast_time.ember_tap or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Ember Tap consumes 1 Burning Ember
+            return state.last_ability == "ember_tap" and -1 or 0
+        end,
+    },
+}, {
+    -- Burning Ember generation modifiers
+    backlash_bonus = function ()
+        return state.buff.backlash.up and 0.1 or 0 -- 10% bonus from Backlash
+    end,
+    
+    backdraft_bonus = function ()
+        return state.buff.backdraft.up and 0.15 or 0 -- 15% bonus from Backdraft
+    end,
+    
+    molten_core_bonus = function ()
+        return state.talent.molten_core.enabled and 0.2 or 0 -- 20% bonus from Molten Core
+    end,
+} )
 
 -- Comprehensive Tier Set and Gear Registration
 -- T14 - Curse of the Elements (Raid Finder/Normal/Heroic)
@@ -1174,6 +1325,42 @@ spec:RegisterAbilities( {
 -- State Expressions for Destruction
 spec:RegisterStateExpr( "burning_embers", function()
     return burning_embers.current
+end )
+
+spec:RegisterStateExpr( "burning_embers_deficit", function()
+    return burning_embers.max - burning_embers.current
+end )
+
+spec:RegisterStateExpr( "current_burning_embers", function()
+    return burning_embers.current or 0
+end )
+
+spec:RegisterStateExpr( "backlash_proc", function()
+    return buff.backlash.up and 1 or 0
+end )
+
+spec:RegisterStateExpr( "backdraft_charges", function()
+    return buff.backdraft.up and buff.backdraft.stack or 0
+end )
+
+spec:RegisterStateExpr( "molten_core_bonus", function()
+    return buff.molten_core.up and 0.15 or 0 -- 15% damage bonus
+end )
+
+spec:RegisterStateExpr( "immolate_debuff_active", function()
+    return debuff.immolate.up and 1 or 0
+end )
+
+spec:RegisterStateExpr( "chaos_bolt_ready", function()
+    return burning_embers.current >= 4 and 1 or 0
+end )
+
+spec:RegisterStateExpr( "ember_tap_ready", function()
+    return burning_embers.current >= 1 and 1 or 0
+end )
+
+spec:RegisterStateExpr( "spell_power", function()
+    return GetSpellBonusDamage(3) -- Fire school
 end )
 
 -- Range

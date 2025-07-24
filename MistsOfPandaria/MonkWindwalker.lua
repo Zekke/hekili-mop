@@ -41,18 +41,180 @@ end)
 local function RegisterWindwalkerSpec()
     if not class or not state or not Hekili.NewSpecialization then return end
 
-    local spec = Hekili:NewSpecialization(269) -- Windwalker spec ID for MoP
-    if not spec then return end -- Not ready yet
+    local spec = Hekili:NewSpecialization(269, true)
+    spec.name = "Windwalker"
+    spec.role = "DAMAGER"
+    spec.primaryStat = 2 -- Agility
 
-    -- Resource Registration
-    spec:RegisterResource(3, { -- Energy
-        base_regen = function()
-            local base = 10
-            if state.talent.ascension.enabled then base = base * 1.10 end -- MoP Ascension is 10% energy regen
-            return base * state.haste
-        end
-    })
-    spec:RegisterResource(12) -- Chi
+    -- Enhanced resource registration for Windwalker Monk
+    spec:RegisterResource(3, { -- Energy with Windwalker-specific mechanics
+        -- Combo Breaker energy efficiency (Windwalker signature)
+        combo_breaker = {
+            aura = "combo_breaker",
+            last = function ()
+                local app = state.buff.combo_breaker.applied
+                local t = state.query_time
+                return app + floor( ( t - app ) / 1 ) * 1
+            end,
+            interval = 1,
+            value = function()
+                -- Combo Breaker provides energy efficiency
+                return state.buff.combo_breaker.up and 3 or 0 -- +3 energy per second during Combo Breaker
+            end,
+        },
+        
+        -- Tiger Palm energy refund mechanics (enhanced for Windwalker)
+        tiger_palm_efficiency = {
+            last = function ()
+                return state.query_time -- Continuous tracking
+            end,
+            interval = 1,
+            value = function()
+                -- Tiger Palm provides better energy efficiency for Windwalker
+                return state.buff.tiger_power.up and 2 or 0 -- +2 energy per second with Tiger Power active (more than Brewmaster)
+            end,
+        },
+        
+        -- Ascension talent bonus (if talented)
+        ascension = {
+            last = function ()
+                return state.query_time -- Continuous passive
+            end,
+            interval = 1,
+            value = function()
+                -- Ascension provides passive energy bonus
+                return state.talent.ascension.enabled and 2 or 0 -- +2 energy per second with Ascension
+            end,
+        },
+        
+        -- Energizing Brew energy boost (if available)
+        energizing_brew = {
+            aura = "energizing_brew",
+            last = function ()
+                local app = state.buff.energizing_brew.applied
+                local t = state.query_time
+                return app + floor( ( t - app ) / 1 ) * 1
+            end,
+            interval = 1,
+            value = function()
+                -- Energizing Brew energy restoration
+                return state.buff.energizing_brew.up and 15 or 0 -- +15 energy per second during Energizing Brew (less than Brewmaster)
+            end,
+        },
+    }, {
+        -- Enhanced base energy regeneration for MoP Windwalker
+        base_regen = 10, -- Base 10 energy per second in MoP
+        haste_scaling = false, -- Energy doesn't scale with haste in MoP
+        
+        regenerates = function()
+            local base = 10 -- Standard energy regen
+            local bonus = 0
+            
+            -- Stance-specific bonuses
+            if state.buff.stance_of_the_fierce_tiger.up then
+                bonus = bonus + 1 -- +1 energy per second in Tiger Stance
+            end
+            
+            -- Combat efficiency (Windwalker combat training)
+            if state.combat then
+                bonus = bonus + 1 -- +1 energy per second in combat (Monk training)
+            end
+            
+            -- Storm, Earth, and Fire energy sharing
+            if state.buff.storm_earth_and_fire.up then
+                bonus = bonus + 2 -- +2 energy per second during clones
+            end
+            
+            return base + bonus
+        end,
+    } )
+
+    spec:RegisterResource(12, { -- Chi with Windwalker-specific mechanics
+        -- Tigereye Brew chi generation synergy (Windwalker signature)
+        tigereye_brew_generation = {
+            last = function ()
+                return state.query_time
+            end,
+            interval = 1,
+            value = function()
+                -- Tigereye Brew builds stacks when spending Chi
+                if state.last_chi_spent and state.last_chi_spent > 0 then
+                    return 0 -- No direct chi generation, but tracks consumption for Tigereye stacks
+                end
+                return 0
+            end,
+        },
+        
+        -- Power Strikes chi bonus (Windwalker talent)
+        power_strikes = {
+            last = function ()
+                return state.query_time
+            end,
+            interval = 20, -- Power Strikes procs every 20 seconds
+            value = function()
+                if state.talent.power_strikes.enabled then
+                    return 1 -- Next Jab generates extra Chi
+                end
+                return 0
+            end,
+        },
+        
+        -- Ascension chi maximum increase (Windwalker talent)
+        ascension_bonus = {
+            last = function ()
+                return state.query_time
+            end,
+            interval = 1,
+            value = function()
+                -- Ascension increases max Chi by 1
+                return state.talent.ascension.enabled and 1 or 0 -- Effective max chi bonus
+            end,
+        },
+        
+        -- Chi Brew instant generation (Windwalker talent)
+        chi_brew_generation = {
+            last = function ()
+                return (state.last_cast_time and state.last_cast_time.chi_brew) or 0
+            end,
+            interval = 1,
+            value = function()
+                -- Chi Brew instantly generates 2 Chi
+                return state.last_ability == "chi_brew" and 2 or 0
+            end,
+        },
+        
+        -- Storm, Earth, and Fire chi efficiency
+        storm_earth_fire_efficiency = {
+            aura = "storm_earth_and_fire",
+            last = function ()
+                return state.query_time
+            end,
+            interval = 1,
+            value = function()
+                -- SEF provides effective chi efficiency through damage multiplication
+                return state.buff.storm_earth_and_fire.up and 0.5 or 0 -- Effective chi value bonus
+            end,
+        },
+    }, {
+        -- Base chi mechanics for Windwalker
+        max_chi = function ()
+            local base = 4 -- Base max Chi in MoP
+            if state.talent.ascension.enabled then
+                base = base + 1 -- Ascension increases max Chi by 1
+            end
+            return base
+        end,
+        
+        -- Chi generation from abilities
+        jab_generation = function ()
+            return 2 -- Jab generates 2 Chi in MoP (enhanced from 1 in earlier expansions)
+        end,
+        
+        -- Chi efficiency from Windwalker mastery
+        combo_strikes_efficiency = function ()
+            return 1.0 -- Combo Strikes mastery affects chi efficiency indirectly
+        end,
+    } )
 
     -- MoP Tier Gear Registration
     spec:RegisterGear("tier14", 85469, 85472, 85475, 85478, 85481)

@@ -132,7 +132,8 @@
         "mana",
         "shadow_orb",
         "combo_points",
-        "reduceCooldown"
+        "reduceCooldown",
+        "UnitDebuff"
     ],
     "Lua.runtime.version": "Lua 5.1",
     "Lua.runtime.builtin": {

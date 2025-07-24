@@ -1,11 +1,14 @@
-if not Hekili or not Hekili.NewSpecialization then return end
 -- HunterMarksmanship.lua
 -- Updated July 05, 2025 - by Smufrik
 
-if not Hekili or not Hekili.NewSpecialization then return end
+-- Early return if not a Hunter
 if select(2, UnitClass('player')) ~= 'HUNTER' then return end
+
 local addon, ns = ...
 local Hekili = _G[ "Hekili" ]
+
+-- Early return if Hekili is not available
+if not Hekili or not Hekili.NewSpecialization then return end
 local class = Hekili.Class
 local state = Hekili.State
 
@@ -67,84 +70,60 @@ local function RegisterMarksmanshipSpec()
 
 -- Enhanced Resource System for Marksmanship
 spec:RegisterResource( 2, { -- Focus = 2 in MoP
-    -- Steady Shot focus generation (Marksmanship signature focus builder)
+    -- Steady Shot focus generation (standard MoP cast time for all specs)
     steady_shot = {
-        aura = "steady_focus",
-        debuff = false,
-        
+        resource = "focus",
         last = function()
-            local app = state.buff.steady_focus.applied
+            local app = (state.last_cast_time and state.last_cast_time.steady_shot) or 0
             local t = state.query_time
-            return app + floor( ( t - app ) / 1.5 ) * 1.5
+            return app + floor( ( t - app ) / 2.0 ) * 2.0
         end,
-        
-        interval = function() return 1.5 / state.haste end,
+        interval = function() return 2.0 / state.haste end, -- Standard 2.0s cast time in MoP
         value = 14, -- Steady Shot generates 14 focus in MoP
     },
     
     -- Cobra Shot focus generation (alternative builder for MM)
     cobra_shot = {
-        aura = "cobra_shot_regen",
-        debuff = false,
-        
+        resource = "focus",
         last = function()
-            local app = state.buff.cobra_shot_regen.applied
+            local app = (state.last_cast_time and state.last_cast_time.cobra_shot) or 0
             local t = state.query_time
-            return app + floor( ( t - app ) / 1.5 ) * 1.5
+            return app + floor( ( t - app ) / 2.0 ) * 2.0
         end,
-        
-        interval = function() return 1.5 / state.haste end,
+        interval = function() return 2.0 / state.haste end,
         value = 14, -- Cobra Shot generates 14 focus in MoP
     },
     
     -- Dire Beast focus generation (if talented)
     dire_beast = {
+        resource = "focus",
         aura = "dire_beast",
-        debuff = false,
-        
         last = function()
             local app = state.buff.dire_beast.applied
             local t = state.query_time
             return app + floor( ( t - app ) / 2 ) * 2
         end,
-        
         interval = 2,
         value = 2, -- Dire Beast generates 2 focus every 2 seconds
     },
     
-    -- Rapid Recuperation focus regen (talent enhancement)
-    rapid_recuperation = {
-        aura = "rapid_recuperation",
-        debuff = false,
-        
+    -- Fervor talent focus restoration
+    fervor = {
+        resource = "focus",
+        aura = "fervor",
         last = function()
-            local app = state.buff.rapid_recuperation.applied
+            local app = state.buff.fervor.applied
             local t = state.query_time
-            return app + floor( ( t - app ) / 3 ) * 3
+            return app + floor( ( t - app ) / 1 ) * 1
         end,
-        
-        interval = 3,
-        value = function() return state.buff.rapid_recuperation.up and 6 or 0 end,
-    },
-    
-    -- Thrill of the Hunt proc focus
-    thrill_proc = {
-        aura = "thrill_of_the_hunt",
-        debuff = false,
-        
-        last = function()
-            return state.buff.thrill_of_the_hunt.applied
-        end,
-        
-        interval = 60,
-        value = function() return state.buff.thrill_of_the_hunt.up and 20 or 0 end,
+        interval = 1,
+        value = function() return state.buff.fervor.up and 50 or 0 end, -- Instant 50 focus
     },
 }, {
-    -- Base focus regeneration with haste scaling (MoP mechanic)
-    haste_scaling = true,
+    -- Enhanced base focus regeneration for MoP Marksmanship
     base_regen = 6, -- Base 6 focus per second in MoP
+    haste_scaling = true,
     
-    -- Enhanced focus regen calculation
     regenerates = function()
         local base = 6 * state.haste
         local bonus = 0
@@ -152,12 +131,18 @@ spec:RegisterResource( 2, { -- Focus = 2 in MoP
         -- Aspect bonuses
         if state.buff.aspect_of_the_iron_hawk.up then
             bonus = bonus + 0.3 -- 30% increased focus regen
+        elseif state.buff.aspect_of_the_hawk.up then
+            bonus = bonus + 0.15 -- 15% increased focus regen
         end
-          -- Talent bonuses (MoP proper talents only)
         
-        -- Rapid Fire bonus
+        -- Rapid Fire bonus (MM signature cooldown)
         if state.buff.rapid_fire.up then
             bonus = bonus + 0.5 -- 50% increased focus regen during Rapid Fire
+        end
+        
+        -- Steady Focus talent bonus (MM specific)
+        if state.buff.steady_focus.up then
+            bonus = bonus + 0.2 -- 20% increased focus regen with Steady Focus
         end
         
         return base * (1 + bonus)
@@ -201,9 +186,9 @@ spec:RegisterGear( "heroic_weapon", 87164, 87183, 89678 )
 -- Enhanced Talent System - MoP Complete Integration
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Movement/Escape Talents
-    posthaste              = { 1, 1, 109248 }, -- Disengage also frees you from all movement impairing effects and increases your movement speed by 50% for 4 sec.
-    narrow_escape          = { 1, 2, 109259 }, -- When you Disengage, you leave behind a web trap that snares all targets within 8 yards, reducing their movement speed by 70% for 8 sec.
-    crouching_tiger        = { 1, 3, 120679 }, -- Reduces the cooldown of Disengage by 6 sec and reduces the cooldown of Deterrence by 10 sec.
+    posthaste              = { 1, 1, 109215 }, -- Disengage also frees you from all movement impairing effects and increases your movement speed by 50% for 4 sec.
+    narrow_escape          = { 1, 2, 109298 }, -- When you Disengage, you leave behind a web trap that snares all targets within 8 yards, reducing their movement speed by 70% for 8 sec.
+    crouching_tiger        = { 1, 3, 118675 }, -- Reduces the cooldown of Disengage by 6 sec and reduces the cooldown of Deterrence by 10 sec.
     
     -- Tier 2 (Level 30) - Crowd Control Talents
     silencing_shot         = { 2, 1, 34490 }, -- Silences the target, preventing any spellcasting for 3 sec.
@@ -612,12 +597,7 @@ spec:RegisterAuras( {
         max_stack = 1,
     },
     
-    explosive_shot = {
-        id = 53301,
-        duration = 2,
-        tick_time = 1,
-        max_stack = 1,
-    },
+    -- explosive_shot aura removed - Survival-only ability in MoP
     
     wyvern_sting = {
         id = 19386,
@@ -801,6 +781,54 @@ spec:RegisterAuras( {
         mechanic = "root",
         max_stack = 1
     },
+
+    -- === PET ABILITY AURAS ===
+    -- Pet basic abilities
+    pet_dash = {
+        id = 61684,
+        duration = 16,
+        max_stack = 1,
+        generate = function( t )
+            if state.pet.alive then
+                t.count = 1
+                t.expires = 0
+                t.applied = 0
+                t.caster = "pet"
+                return
+            end
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end,
+    },
+    
+    pet_prowl = {
+        id = 24450,
+        duration = 3600,
+        max_stack = 1,
+        generate = function( t )
+            if state.pet.alive and state.pet.family == "cat" then
+                t.count = 1
+                t.expires = 0
+                t.applied = 0
+                t.caster = "pet"
+                return
+            end
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end,
+    },
+    
+    -- Pet debuffs on targets
+    growl = {
+        id = 2649,
+        duration = 3,
+        max_stack = 1,
+        type = "Taunt",
+    },
 } )
 
 -- Enhanced Pet System for Marksmanship
@@ -925,7 +953,7 @@ spec:RegisterAbilities( {
     -- === FOCUS BUILDERS ===
     steady_shot = {
         id = 56641,
-        cast = function() return 1.5 / haste end,
+        cast = function() return 2.0 / haste end,
         cooldown = 0,
         gcd = "spell",
         school = "physical",
@@ -1058,7 +1086,7 @@ spec:RegisterAbilities( {
         school = "physical",
         
         spend = function()
-            local cost = 40
+            local cost = 40 -- Standard MoP Multi-Shot cost
             if talent.improved_multi_shot.enabled then
                 cost = cost - (talent.improved_multi_shot.rank * 5) -- Reduces cost by 5/10/15
             end
@@ -1078,13 +1106,13 @@ spec:RegisterAbilities( {
         startsCombat = true,
         
         handler = function ()
-            -- Thrill of the Hunt proc chance
+            -- Thrill of the Hunt proc chance (30% chance in MoP)
             if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
-                gain( 20, "focus" )
-                addStack( "thrill_of_the_hunt" )
+                applyBuff( "thrill_of_the_hunt", 20 ) -- 20-second duration, not focus gain
             end
             
             -- Scattered Shots damage bonus per target (handled by talent system)
+            -- Multi-Shot hits all enemies within 8 yards of target
         end,
     },
     
@@ -1118,23 +1146,7 @@ spec:RegisterAbilities( {
         end,
     },
     
-    explosive_shot = {
-        id = 53301,
-        cast = 0,
-        cooldown = 30,
-        gcd = "spell",
-        school = "fire",
-        
-        spend = 40,
-        spendType = "focus",
-        
-        talent = "explosive_shot",
-        startsCombat = true,
-        
-        handler = function ()
-            applyDebuff( "target", "explosive_shot", 2 )
-        end,
-    },    
+    -- Explosive Shot removed - This is a Survival-only ability in MoP Classic    
     -- === TALENT ABILITIES ===
     -- Tier 4 (Level 60) Talents
     a_murder_of_crows = {
@@ -1667,6 +1679,88 @@ spec:RegisterAbilities( {
             dismissPet()
         end,
     },
+
+    -- === BASIC PET ABILITIES ===
+    pet_growl = {
+        id = 2649,
+        cast = 0,
+        cooldown = 5,
+        gcd = "off",
+        school = "physical",
+
+        startsCombat = true,
+
+        usable = function() return pet.alive, "requires a living pet" end,
+
+        handler = function ()
+            -- Pet taunt - forces target to attack pet
+            applyDebuff( "target", "growl", 3 )
+        end,
+    },
+
+    pet_claw = {
+        id = 16827,
+        cast = 0,
+        cooldown = 6,
+        gcd = "off",
+        school = "physical",
+
+        startsCombat = true,
+
+        usable = function() return pet.alive and pet.family == "cat", "requires cat pet" end,
+
+        handler = function ()
+            -- Basic cat attack
+        end,
+    },
+
+    pet_bite = {
+        id = 17253,
+        cast = 0,
+        cooldown = 6,
+        gcd = "off",
+        school = "physical",
+
+        startsCombat = true,
+
+        usable = function() return pet.alive and (pet.family == "wolf" or pet.family == "dog"), "requires wolf or dog pet" end,
+
+        handler = function ()
+            -- Basic canine attack
+        end,
+    },
+
+    pet_dash = {
+        id = 61684,
+        cast = 0,
+        cooldown = 30,
+        gcd = "off",
+        school = "physical",
+
+        startsCombat = false,
+
+        usable = function() return pet.alive, "requires a living pet" end,
+
+        handler = function ()
+            applyBuff( "pet_dash", 16 )
+        end,
+    },
+
+    pet_prowl = {
+        id = 24450,
+        cast = 0,
+        cooldown = 0,
+        gcd = "off",
+        school = "physical",
+
+        startsCombat = false,
+
+        usable = function() return pet.alive and pet.family == "cat", "requires cat pet" end,
+
+        handler = function ()
+            applyBuff( "pet_prowl" )
+        end,
+    },
     
     -- === TRAPS ===
     freezing_trap = {
@@ -1904,6 +1998,82 @@ end )
 
 spec:RegisterStateExpr( "bloodlust", function()
     return buff.bloodlust
+end )
+
+-- === SHOT ROTATION STATE EXPRESSIONS ===
+
+-- For Marksmanship, Steady Shot is primary focus generator with special buffs
+spec:RegisterStateExpr( "should_steady_shot", function()
+    -- Steady Shot is preferred for Marksmanship when:
+    -- 1. We need to maintain Steady Focus buff
+    -- 2. We need reliable focus generation
+    -- 3. We can benefit from Improved Steady Shot
+    
+    if focus.current > 86 then return false end -- Don't cast if we'll cap focus
+    
+    -- High priority if Steady Focus is down or expiring soon
+    if not buff.steady_focus.up or buff.steady_focus.remains < 3 then
+        return true
+    end
+    
+    -- Use for general focus generation
+    return true
+end )
+
+-- Cobra Shot is secondary for MM, used mainly for Serpent Sting maintenance
+spec:RegisterStateExpr( "should_cobra_shot", function()
+    -- Cobra Shot for Marksmanship when:
+    -- 1. Serpent Sting needs maintenance
+    -- 2. Steady Shot isn't optimal
+    
+    if focus.current > 86 then return false end -- Don't cast if we'll cap focus
+    
+    -- Use for Serpent Sting maintenance
+    if debuff.serpent_sting.up and debuff.serpent_sting.remains < 6 then
+        return true
+    end
+    
+    -- Otherwise prefer Steady Shot for MM
+    return not should_steady_shot
+end )
+
+-- Focus management optimized for Aimed Shot usage
+spec:RegisterStateExpr( "focus_spender_threshold", function()
+    -- Marksmanship focus priorities:
+    -- Aimed Shot: 50 focus (highest priority when proc'd)
+    -- Chimera Shot: 35 focus
+    -- Arcane Shot: 20 focus
+    
+    -- During Careful Aim, prioritize Aimed Shot
+    if buff.careful_aim.up then return 60 end
+    
+    -- With Master Marksman, save focus for instant Aimed Shot
+    if buff.master_marksman.stack >= 3 then return 70 end
+    
+    -- Normal threshold
+    return 75
+end )
+
+-- Determines if we should use focus builders or wait for abilities
+spec:RegisterStateExpr( "optimal_shot_window", function()
+    -- Optimal windows for MM shot rotation:
+    -- 1. When major abilities are on cooldown
+    -- 2. When we have focus room
+    -- 3. When building/maintaining buffs
+    
+    if focus.current < 30 then return false end
+    
+    -- Don't build focus if Aimed Shot is ready and we have proc
+    if cooldown.aimed_shot.ready and (buff.master_marksman.stack >= 5 or buff.careful_aim.up) then
+        return false
+    end
+    
+    -- Don't build if Chimera Shot is ready and Serpent Sting is up
+    if cooldown.chimera_shot.ready and debuff.serpent_sting.up then
+        return false
+    end
+    
+    return true
 end )
 
 -- Combat Log Event Tracking for Marksmanship mechanics

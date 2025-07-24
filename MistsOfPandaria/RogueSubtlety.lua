@@ -6,7 +6,7 @@ local _, playerClass = UnitClass('player')
 if playerClass ~= 'ROGUE' then return end
 
 local addon, ns = ...
-local Hekili = _G[ addon ]
+local Hekili = _G[ "Hekili" ]
 local class, state = Hekili.Class, Hekili.State
 
 local insert, wipe = table.insert, table.wipe
@@ -19,17 +19,206 @@ spec.name = "Subtlety"
 spec.role = "DAMAGER"
 spec.primaryStat = 2 -- Agility
 
-spec:RegisterResource( 3, { -- Energy
-  shadow_techniques = {
-    last = function () return state.query_time end,
-    interval = function () return state.time_to_sht[5] end,
-    value = 7,
-    stop = function () return state.time_to_sht[5] == 0 or state.time_to_sht[5] == 3600 end,
-  }
+-- Enhanced resource registration for Subtlety Rogue with Shadow mechanics
+spec:RegisterResource( 3, { -- Energy with Subtlety-specific enhancements
+    -- Shadow Techniques energy bonus (Subtlety passive)
+    shadow_techniques = {
+        last = function () 
+            return state.query_time -- Continuous tracking
+        end,
+        interval = 2, -- Shadow Techniques procs roughly every 2 seconds
+        value = 7, -- Shadow Techniques grants 7 energy per proc
+        stop = function () 
+            return not state.combat -- Only active in combat
+        end,
+    },
+    
+    -- Shadow Focus talent energy efficiency (enhanced for Subtlety)
+    shadow_focus = {
+        aura = "stealth",
+        last = function ()
+            return state.buff.stealth.applied or state.buff.vanish.applied or state.buff.shadow_dance.applied or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Shadow Focus is more powerful for Subtlety (stealth specialists)
+            local stealth_bonus = (state.buff.stealth.up or state.buff.vanish.up or state.buff.shadow_dance.up) and 4 or 0
+            return stealth_bonus -- +4 energy per second while stealthed (more than other specs)
+        end,
+    },
+    
+    -- Shadow Dance energy efficiency (Subtlety signature)
+    shadow_dance = {
+        aura = "shadow_dance",
+        last = function ()
+            local app = state.buff.shadow_dance.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 1 ) * 1
+        end,
+        interval = 1,
+        value = function()
+            -- Enhanced energy efficiency during Shadow Dance
+            return state.buff.shadow_dance.up and 3 or 0 -- +3 energy per second during Shadow Dance
+        end,
+    },
+    
+    -- Shadowstep energy efficiency
+    shadowstep = {
+        aura = "shadowstep",
+        last = function ()
+            local app = state.buff.shadowstep.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 1 ) * 1
+        end,
+        interval = 1,
+        value = function()
+            -- Brief energy boost after Shadowstep
+            return state.buff.shadowstep.up and 2 or 0 -- +2 energy per second for short duration
+        end,
+    },
+    
+    -- Relentless Strikes energy return (enhanced for Subtlety)
+    relentless_strikes_energy = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Relentless Strikes: Enhanced for Subtlety with stealth bonuses
+            if state.talent.relentless_strikes.enabled and state.last_finisher_cp then
+                local energy_chance = state.last_finisher_cp * 0.05 -- 5% chance per combo point (enhanced for Subtlety)
+                local stealth_bonus = (state.buff.stealth.up or state.buff.vanish.up or state.buff.shadow_dance.up) and 1.5 or 1.0
+                return math.random() < energy_chance and (25 * stealth_bonus) or 0
+            end
+            return 0
+        end,
+    },
+    
+    -- Find Weakness energy efficiency bonus
+    find_weakness_energy = {
+        aura = "find_weakness",
+        last = function ()
+            return state.buff.find_weakness.applied or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Find Weakness provides energy efficiency bonus
+            return state.buff.find_weakness.up and 3 or 0 -- +3 energy per second with Find Weakness
+        end,
+    },
+}, {
+    -- Enhanced base energy regeneration for Subtlety with Shadow mechanics
+    base_regen = function ()
+        local base = 10 -- Base energy regeneration in MoP (10 energy per second)
+        
+        -- Haste scaling for energy regeneration (minor in MoP)
+        local haste_bonus = 1.0 + ((state.stat.haste_rating or 0) / 42500) -- Approximate haste scaling
+        
+        -- Subtlety gets enhanced energy efficiency in stealth
+        local stealth_bonus = 1.0
+        if state.talent.shadow_focus.enabled and (state.buff.stealth.up or state.buff.vanish.up or state.buff.shadow_dance.up) then
+            stealth_bonus = 1.75 -- 75% bonus energy efficiency while stealthed (stronger than other specs)
+        end
+        
+        -- Master of Subtlety energy efficiency
+        local subtlety_bonus = 1.0
+        if state.buff.master_of_subtlety.up then
+            subtlety_bonus = 1.10 -- 10% energy efficiency bonus
+        end
+        
+        return base * haste_bonus * stealth_bonus * subtlety_bonus
+    end,
+    
+    -- Preparation energy burst
+    preparation_energy = function ()
+        return state.talent.preparation.enabled and 3 or 0 -- Enhanced energy burst from preparation resets for Subtlety
+    end,
+    
+    -- Shadow Clone energy efficiency (if available)
+    shadow_clone_efficiency = function ()
+        return state.buff.shadow_clone.up and 1.15 or 1.0 -- 15% energy efficiency during Shadow Clone
+    end,
 } )
 
-spec:RegisterResource( 3 ) -- Energy
-spec:RegisterResource( 4 ) -- ComboPoints 
+-- Combo Points resource registration with Subtlety-specific mechanics
+spec:RegisterResource( 4, { -- Combo Points = 4 in MoP
+    -- Honor Among Thieves combo point generation (Subtlety signature)
+    honor_among_thieves = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1, -- HAT has higher proc chance for Subtlety
+        value = function()
+            if state.talent.honor_among_thieves.enabled and state.group_members > 1 then
+                -- Subtlety gets enhanced HAT generation in groups
+                return state.group_members >= 3 and 1 or 0 -- Better in larger groups
+            end
+            return 0
+        end,
+    },
+    
+    -- Premeditation combo point generation (Subtlety opener)
+    premeditation = {
+        last = function ()
+            return state.last_cast_time.premeditation or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Premeditation generates 2 combo points when opening from stealth
+            if state.last_ability == "premeditation" and (state.buff.stealth.up or state.buff.vanish.up) then
+                return 2
+            end
+            return 0
+        end,
+    },
+    
+    -- Initiative bonus combo points (Subtlety talent)
+    initiative_bonus = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Initiative: Stealth abilities generate additional combo points
+            if state.talent.initiative.enabled and state.last_stealth_ability then
+                return state.talent.initiative.rank or 1 -- Variable rank in MoP
+            end
+            return 0
+        end,
+    },
+    
+    -- Shadow Clone combo point generation (from Shadow Dance)
+    shadow_dance_generation = {
+        aura = "shadow_dance",
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Shadow Dance enhances combo point generation efficiency
+            if state.buff.shadow_dance.up and state.last_stealth_ability then
+                return 1 -- Extra combo point generation during Shadow Dance
+            end
+            return 0
+        end,
+    },
+}, {
+    -- Base combo point mechanics for Subtlety
+    max_combo_points = function ()
+        return 5 -- Maximum 5 combo points in MoP
+    end,
+    
+    -- Subtlety's enhanced stealth combo point efficiency
+    stealth_efficiency = function ()
+        -- Stealth abilities are more efficient for Subtlety
+        return (state.buff.stealth.up or state.buff.vanish.up or state.buff.shadow_dance.up) and 1.25 or 1.0
+    end,
+    
+    -- Master of Subtlety damage bonus affects combo point value
+    master_of_subtlety_value = function ()
+        return state.buff.master_of_subtlety.up and 1.1 or 1.0 -- 10% effective combo point value bonus
+    end,
+} )
 
 -- Talents
 spec:RegisterTalents( {
@@ -90,7 +279,7 @@ spec:RegisterAuras( {
   },
   kidney_shot = {
     id = 408,
-    duration = function() return 1 + min(5, effective_combo_points) end, -- MoP: 1s base + 1s per combo point.
+    duration = function() return 1 + min(5, effective_combo_points) end, -- MoP Classic: 1s base + 1s per combo point (correct)
     max_stack = 1
   },
   preparation = {
@@ -114,7 +303,7 @@ spec:RegisterAuras( {
     max_stack = 1
   },
   shadowstep = {
-    id = 36563,
+    id = 36554, -- Use same ID as ability for consistency
     duration = 2,
     max_stack = 1
   },
@@ -134,7 +323,7 @@ spec:RegisterAuras( {
     max_stack = 1
   },
   vanish = {
-    id = 11327,
+    id = 1856, -- Standardized to match other specs
     duration = 10,
     max_stack = 1
   },
@@ -147,7 +336,7 @@ spec:RegisterAuras( {
   },
   rupture = {
     id = 1943,
-    duration = function() return 4 + (4 * min(5, effective_combo_points)) end, -- MoP: 4s base + 4s per combo point.
+    duration = function() return 8 + (4 * min(5, effective_combo_points)) end, -- MoP Classic: 8s base + 4s per combo point
     max_stack = 1
   },
   deadly_poison = {
@@ -163,6 +352,20 @@ spec:RegisterAuras( {
   mind_numbing_poison = {
     id = 5760,
     duration = 10,
+    max_stack = 1
+  },
+  
+  -- Find Weakness - Subtlety signature debuff/buff
+  find_weakness = {
+    id = 91021,
+    duration = 10,
+    max_stack = 1
+  },
+  
+  -- Shadow Clone - enhanced Shadow Dance effect
+  shadow_clone = {
+    id = 159621,
+    duration = 8,
     max_stack = 1
   },
   
@@ -245,11 +448,15 @@ spec:RegisterAbilities( {
     usable = function () return combo_points.current > 0, "requires combo points" end,
 
     handler = function ()
+      local cp = combo_points.current
+      
       if buff.slice_and_dice.up then
-        buff.slice_and_dice.expires = buff.slice_and_dice.expires + effective_combo_points * 3
+        buff.slice_and_dice.expires = buff.slice_and_dice.expires + cp * 3
       end
       
-      spend( combo_points.current, "combo_points" )
+      spend( cp, "combo_points" )
+      -- Track for Relentless Strikes
+      state.last_finisher_cp = cp
     end
   },
 
@@ -288,8 +495,12 @@ spec:RegisterAbilities( {
     usable = function () return combo_points.current > 0, "requires combo points" end,
 
     handler = function ()
-      applyDebuff( "target", "rupture", 4 + (4 * effective_combo_points) )
-      spend( combo_points.current, "combo_points" )
+      local cp = combo_points.current
+      -- MoP Classic: 8 seconds base + 4 seconds per combo point
+      applyDebuff( "target", "rupture", 8 + (4 * cp) )
+      spend( cp, "combo_points" )
+      -- Track for Relentless Strikes
+      state.last_finisher_cp = cp
     end
   },
 
@@ -308,8 +519,11 @@ spec:RegisterAbilities( {
     usable = function () return combo_points.current > 0, "requires combo points" end,
 
     handler = function ()
-      applyBuff( "slice_and_dice", 6 + (6 * effective_combo_points) )
-      spend( combo_points.current, "combo_points" )
+      local cp = combo_points.current
+      applyBuff( "slice_and_dice", 6 + (6 * cp) )
+      spend( cp, "combo_points" )
+      -- Track for Relentless Strikes
+      state.last_finisher_cp = cp
     end
   },
 
@@ -353,7 +567,23 @@ spec:RegisterAbilities( {
     toggle = "cooldowns",
 
     handler = function ()
-      applyBuff( "shadow_dance" )
+      -- Shadow Dance: Subtlety signature ability
+      applyBuff( "shadow_dance", 8 ) -- 8 second duration
+      
+      -- Shadow Dance grants stealth-like benefits without breaking existing stealth
+      -- Apply enhanced energy regeneration during Shadow Dance
+      if not buff.stealth.up then
+        -- Only apply if not already stealthed
+        applyBuff( "stealth", 8 ) -- Grants stealth-like benefits
+      end
+      
+      -- Shadow Clone effects if talented (MoP mechanic)
+      if talent.shadow_clone and talent.shadow_clone.enabled then
+        applyBuff( "shadow_clone", 8 )
+      end
+      
+      -- Apply Find Weakness buff for enhanced damage
+      applyBuff( "find_weakness", 10 ) -- Slightly longer than Shadow Dance for overlap
     end
   },
 

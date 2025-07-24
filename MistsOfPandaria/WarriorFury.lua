@@ -36,9 +36,87 @@ end
 
 local spec = Hekili:NewSpecialization( 72 ) -- Fury spec ID for MoP
 
--- Register resources
-local ResourceInfo = ns.GetResourceInfo()
-spec:RegisterResource( ResourceInfo.rage )
+-- Enhanced resource registration for Fury Warrior with signature mechanics
+spec:RegisterResource( 1, { -- Rage with Fury-specific enhancements
+    -- Bloodthirst rage generation (Fury signature ability)
+    bloodthirst_regen = {
+        last = function ()
+            return state.last_cast_time.bloodthirst or 0
+        end,
+        interval = 3, -- Bloodthirst cooldown
+        value = function()
+            -- Bloodthirst generates rage on crit in Fury
+            return state.last_ability == "bloodthirst" and 5 or 0
+        end,
+    },
+    
+    -- Berserker Rage enhancement (Fury gets more benefit)
+    berserker_rage = {
+        aura = "berserker_rage",
+        last = function ()
+            local app = state.buff.berserker_rage.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 1 ) * 1
+        end,
+        interval = 1,
+        value = function()
+            -- Berserker Rage grants extra rage for Fury
+            return state.buff.berserker_rage.up and 7 or 0 -- Higher than Arms/Prot
+        end,
+    },
+    
+    -- Enrage rage generation (when enraged from Bloodthirst)
+    enrage_regen = {
+        aura = "enrage",
+        last = function ()
+            local app = state.buff.enrage.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 2 ) * 2
+        end,
+        interval = 2,
+        value = function()
+            -- Extra rage generation while enraged
+            return state.buff.enrage.up and 3 or 0
+        end,
+    },
+    
+    -- Bloodsurge proc efficiency (reduces Wild Strike cost effectively)
+    bloodsurge_efficiency = {
+        aura = "bloodsurge",
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Bloodsurge makes next Wild Strike cost no rage (effective generation)
+            return state.buff.bloodsurge.up and 30 or 0 -- Wild Strike base cost in rage
+        end,
+    },
+}, {
+    -- Enhanced base rage generation for Fury (dual-wield mechanics)
+    base_regen = function ()
+        local base = 0
+        local weapon_bonus = 0
+        
+        -- Dual-wield rage generation from auto attacks
+        local mainhand_speed = state.main_hand.speed or 2.6
+        local offhand_speed = state.off_hand.speed or 2.6
+        
+        if state.combat then
+            weapon_bonus = (3.5 / mainhand_speed) * 2.0  -- Mainhand
+            if state.dual_wield then
+                weapon_bonus = weapon_bonus + (3.5 / offhand_speed) * 1.0  -- Offhand (50% rate)
+            end
+        end
+        
+        return base + weapon_bonus
+    end,
+    
+    -- Wild Strike rage efficiency when dual-wielding
+    wild_strike_proc = function ()
+        return state.dual_wield and 1 or 0 -- Extra rage generation from dual-wield mastery
+    end,
+} )
 
 -- ===================
 -- ENHANCED COMBAT LOG EVENT TRACKING
@@ -178,7 +256,7 @@ end, 144329 )
 -- Talents (MoP talent system - ID, enabled, spell_id)
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Mobility
-    juggernaut                 = { 1, 1, 103156 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
+    juggernaut                 = { 1, 1, 103826 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
     double_time                = { 1, 2, 103827 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and no longer generates Rage.
     warbringer                 = { 1, 3, 103828 }, -- Charge also roots the target for 4 sec, and Hamstring generates more Rage.
 

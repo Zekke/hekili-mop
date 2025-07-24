@@ -292,10 +292,10 @@ spec:RegisterGear( "meta_effulgent", 76881 )          -- Effulgent Shadowspirit 
 -- Talents (MoP talent system and Frost spec-specific talents)
 spec:RegisterTalents( {
     -- Common MoP talent system (Tier 1-6)
-    -- Tier 1 (Level 56) - Mobility
-    unholy_presence      = { 1, 1, 48265 },
-    frost_presence       = { 1, 2, 48266 },
-    blood_presence       = { 1, 3, 48263 },
+    -- Tier 1 (Level 56)
+    roiling_blood        = { 1, 1, 108170 }, -- Your Pestilence refreshes disease durations and spreads diseases from each diseased target to all other targets.
+    plague_leech         = { 1, 2, 123693 }, -- Extract diseases from an enemy target, consuming up to 2 diseases on the target to gain 1 Rune of each type that was removed.
+    unholy_blight        = { 1, 3, 115989 }, -- Causes you to spread your diseases to all enemy targets within 10 yards.
     
     -- Tier 2 (Level 57)
     lichborne            = { 2, 1, 49039 },
@@ -305,18 +305,19 @@ spec:RegisterTalents( {
     -- Tier 3 (Level 58)
     deaths_advance       = { 3, 1, 96268 },
     chilblains           = { 3, 2, 50041 },
-    asphyxiate          = { 3, 3, 108194 },
+    asphyxiate           = { 3, 3, 108194 },
     
-    -- Tier 4 (Level 59)
+    -- Tier 4 (Level 60)
     death_pact           = { 4, 1, 48743 },
     death_siphon         = { 4, 2, 108196 },
     conversion           = { 4, 3, 119975 },
     
-    -- Tier 5 (Level 60)
+    -- Tier 5 (Level 75)
     blood_tap            = { 5, 1, 45529 },
     runic_empowerment    = { 5, 2, 81229 },
-    runic_corruption     = { 5, 3, 51460 },
-      -- Tier 6 (Level 75)
+    runic_corruption     = { 5, 3, 51462 },
+    
+    -- Tier 6 (Level 90)
     gorefiends_grasp     = { 6, 1, 108199 },
     remorseless_winter   = { 6, 2, 108200 },
     desecrated_ground    = { 6, 3, 108201 },

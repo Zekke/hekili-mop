@@ -58,6 +58,34 @@ end)
 
 afflictionCombatLogFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
+-- Pet management system for Affliction Warlock
+local function summon_demon(demon_type)
+    -- Track which demon is active
+    if demon_type == "imp" then
+        applyBuff("grimoire_of_sacrifice_imp")
+    elseif demon_type == "voidwalker" then
+        applyBuff("grimoire_of_sacrifice_voidwalker")
+    elseif demon_type == "succubus" then
+        applyBuff("grimoire_of_sacrifice_succubus")
+    elseif demon_type == "felhunter" then
+        applyBuff("grimoire_of_sacrifice_felhunter")
+    elseif demon_type == "felguard" then
+        applyBuff("grimoire_of_sacrifice_felguard")
+    end
+end
+
+-- Pet stat tracking
+local function update_pet_stats()
+    local pet_health = UnitHealth("pet") or 0
+    local pet_max_health = UnitHealthMax("pet") or 1
+    local pet_health_pct = pet_health / pet_max_health
+    
+    -- Update pet health state for Dark Pact calculations
+    if state then
+        state.pet_health_pct = pet_health_pct
+    end
+end
+
 -- Soul Shard generation tracking
 RegisterAfflictionCombatLogEvent("SPELL_CAST_SUCCESS", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool)
     if spellID == 686 then -- Shadow Bolt
@@ -69,27 +97,73 @@ RegisterAfflictionCombatLogEvent("SPELL_CAST_SUCCESS", function(timestamp, subev
     end
 end)
 
--- DoT application and tick tracking
+-- DoT application and tick tracking with pandemic refresh
 RegisterAfflictionCombatLogEvent("SPELL_AURA_APPLIED", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool)
     if spellID == 172 then -- Corruption
         -- Track Corruption application for pandemic refresh
+        local remaining = select(6, FindUnitDebuffByID("target", 172, "PLAYER"))
+        if remaining then
+            -- Pandemic refresh: if remaining duration is less than 30% of base duration, extend it
+            local base_duration = 18 -- Corruption base duration in MoP
+            if remaining < (base_duration * 0.3) then
+                -- Extend duration by base duration
+                applyDebuff("target", "corruption", base_duration)
+            end
+        end
     elseif spellID == 30108 then -- Unstable Affliction
         -- Track UA application for pandemic refresh
+        local remaining = select(6, FindUnitDebuffByID("target", 30108, "PLAYER"))
+        if remaining then
+            -- Pandemic refresh: if remaining duration is less than 30% of base duration, extend it
+            local base_duration = 15 -- UA base duration in MoP
+            if remaining < (base_duration * 0.3) then
+                -- Extend duration by base duration
+                applyDebuff("target", "unstable_affliction", base_duration)
+            end
+        end
     elseif spellID == 348 then -- Agony
         -- Track Agony application and stack building
+        local stacks = select(3, FindUnitDebuffByID("target", 348, "PLAYER"))
+        if stacks and stacks < 10 then
+            -- Agony stacks up to 10 times
+            addStack("agony", nil, 1)
+        end
     elseif spellID == 48181 then -- Haunt
         -- Track Haunt application for Soul Shard generation
+        applyDebuff("target", "haunt", 12) -- Haunt duration in MoP
     end
 end)
 
--- DoT tick damage tracking for Malefic Grasp
+-- DoT tick damage tracking for Malefic Grasp and Soul Shard generation
 RegisterAfflictionCombatLogEvent("SPELL_PERIODIC_DAMAGE", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool)
     if spellID == 172 then -- Corruption
         -- Corruption ticks trigger Soul Shard generation
+        local critical = select(21, CombatLogGetCurrentEventInfo())
+        local shards_generated = 0.1
+        if critical then shards_generated = shards_generated + 0.05 end -- Critical ticks generate more
+        
+        if state and state.soul_shards then
+            gain(shards_generated, "soul_shards")
+        end
     elseif spellID == 30108 then -- Unstable Affliction
         -- UA ticks trigger Soul Shard generation
+        local critical = select(21, CombatLogGetCurrentEventInfo())
+        local shards_generated = 0.15
+        if critical then shards_generated = shards_generated + 0.1 end -- Critical ticks generate more
+        
+        if state and state.soul_shards then
+            gain(shards_generated, "soul_shards")
+        end
     elseif spellID == 980 then -- Agony
         -- Agony ticks with increasing damage and Soul Shard generation
+        local stacks = select(3, FindUnitDebuffByID("target", 348, "PLAYER"))
+        local critical = select(21, CombatLogGetCurrentEventInfo())
+        local shards_generated = 0.1 + (stacks or 0) * 0.02 -- More stacks = more shards
+        if critical then shards_generated = shards_generated + 0.1 end
+        
+        if state and state.soul_shards then
+            gain(shards_generated, "soul_shards")
+        end
     end
 end)
 
@@ -103,10 +177,101 @@ RegisterAfflictionCombatLogEvent("SPELL_AURA_APPLIED", function(timestamp, subev
 end)
 
 -- Enhanced Mana resource system for Affliction Warlock
-spec:RegisterResource( 0 ) -- Mana = 0 in MoP
+spec:RegisterResource( 0, {
+    -- Life Tap mana restoration (Warlock signature mechanic)
+    life_tap = {
+        last = function ()
+            return state.last_cast_time.life_tap or 0
+        end,
+        interval = 1.5, -- Life Tap GCD
+        value = function()
+            -- Life Tap converts health to mana (30% max mana in MoP)
+            return state.last_ability == "life_tap" and state.mana.max * 0.30 or 0
+        end,
+    },
+    
+    -- Dark Pact mana return (from demon health)
+    dark_pact = {
+        last = function ()
+            return state.last_cast_time.dark_pact or 0
+        end,
+        interval = 1.5, -- Dark Pact GCD
+        value = function()
+            -- Dark Pact converts demon health to mana
+            return state.last_ability == "dark_pact" and state.mana.max * 0.25 or 0
+        end,
+    },
+}, {
+    -- Base mana regeneration for Affliction
+    base_regen = function ()
+        local base = state.mana.max * 0.01 -- 1% base (Warlocks have low base regen)
+        local spirit_bonus = (state.stat.spirit or 0) * 0.4 -- Spirit is less effective for Warlocks
+        
+        -- Fel Armor bonus to mana regeneration
+        if state.buff.fel_armor.up then
+            base = base * 1.20 -- 20% bonus
+        end
+        
+        return (base + spirit_bonus) / 5 -- Convert to per-second
+    end,
+    
+    -- Improved Life Tap talent bonus
+    improved_life_tap = function ()
+        return state.talent.improved_life_tap.enabled and 0.2 or 0 -- 20% spell power as mana efficiency
+    end,
+} )
 
--- Soul Shards resource system  
-spec:RegisterResource( 7 ) -- SoulShards = 7 in MoP
+-- Soul Shards resource system for Affliction
+spec:RegisterResource( 7, {
+    -- Soul Shard generation from DoT ticks
+    dot_generation = {
+        last = function ()
+            return state.last_dot_tick or 0
+        end,
+        interval = 3, -- DoT tick interval
+        value = function()
+            -- Corruption, Agony, and UA ticks can generate Soul Shards
+            local shards_generated = 0
+            if state.debuff.corruption.up then shards_generated = shards_generated + 0.1 end
+            if state.debuff.agony.up then shards_generated = shards_generated + 0.15 end
+            if state.debuff.unstable_affliction.up then shards_generated = shards_generated + 0.2 end
+            return shards_generated
+        end,
+    },
+    
+    -- Drain Soul generation when target dies
+    drain_soul_death = {
+        last = function ()
+            return state.last_target_death or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Drain Soul generates 1 Soul Shard when target dies
+            return state.last_ability == "drain_soul" and state.target_died and 1 or 0
+        end,
+    },
+    
+    -- Haunt Soul Shard generation
+    haunt_generation = {
+        last = function ()
+            return state.last_cast_time.haunt or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Haunt generates 1 Soul Shard when it fades
+            return state.last_ability == "haunt" and 1 or 0
+        end,
+    },
+}, {
+    -- Soul Shard generation modifiers
+    nightfall_bonus = function ()
+        return state.talent.nightfall.enabled and 0.1 or 0 -- 10% bonus from Nightfall
+    end,
+    
+    soul_harvest_bonus = function ()
+        return state.talent.soul_harvest.enabled and 0.2 or 0 -- 20% bonus from Soul Harvest
+    end,
+} )
 
 -- Comprehensive Tier Sets with all difficulty levels
 spec:RegisterGear( "tier14", { -- Tier 14 (Heart of Fear) - Sha-Skin Regalia
@@ -1677,6 +1842,38 @@ spec:RegisterAbilities( {
 -- State Expressions for Affliction
 spec:RegisterStateExpr( "soul_shards", function()
     return soul_shards.current
+end )
+
+spec:RegisterStateExpr( "soul_shards_deficit", function()
+    return soul_shards.max - soul_shards.current
+end )
+
+spec:RegisterStateExpr( "current_soul_shards", function()
+    return soul_shards.current or 0
+end )
+
+spec:RegisterStateExpr( "nightfall_proc", function()
+    return buff.nightfall.up and 1 or 0
+end )
+
+spec:RegisterStateExpr( "soul_harvest_active", function()
+    return buff.soul_harvest.up and 1 or 0
+end )
+
+spec:RegisterStateExpr( "haunt_debuff_active", function()
+    return debuff.haunt.up and 1 or 0
+end )
+
+spec:RegisterStateExpr( "malefic_grasp_bonus", function()
+    return buff.malefic_grasp.up and 0.25 or 0 -- 25% damage bonus
+end )
+
+spec:RegisterStateExpr( "dark_soul_bonus", function()
+    return buff.dark_soul.up and 0.3 or 0 -- 30% damage bonus
+end )
+
+spec:RegisterStateExpr( "spell_power", function()
+    return GetSpellBonusDamage(6) -- Shadow school
 end )
 
 -- Range

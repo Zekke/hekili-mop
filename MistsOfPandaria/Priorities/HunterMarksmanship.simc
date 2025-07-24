@@ -71,7 +71,8 @@ actions.aoe+=/serpent_sting,cycle_targets=1,if=!debuff.serpent_sting.up&target.t
 actions.movement+=/aspect_of_the_cheetah,if=!combat&!buff.aspect_of_the_cheetah.up
 actions.movement+=/concussive_shot,if=target.distance>=15&!debuff.concussive_shot.up
 actions.movement+=/disengage,if=target.distance<=8
-actions.movement+=/steady_shot,if=movement.distance>=15&focus<=80
+actions.movement+=/steady_shot,if=should_steady_shot&movement.distance>=15&focus<=80
+actions.movement+=/cobra_shot,if=should_cobra_shot&movement.distance>=15&focus<=80
 
 # Defensive priorities
 actions.defensive+=/deterrence,if=incoming_damage_5s>health.max*0.4
@@ -85,10 +86,9 @@ actions.pet_management+=/intimidation,if=talent.intimidation.enabled&target.cast
 actions.pet_management+=/call_pet_1,if=!pet.alive&combat
 actions.pet_management+=/bestial_wrath,if=pet.alive&buff.rapid_fire.up
 
-# Focus management optimization
-actions.focus_management+=/steady_shot,if=focus_time_to_max>3&focus<=60&!buff.steady_focus.up
-actions.focus_management+=/steady_shot,if=buff.steady_focus.remains<=2&buff.steady_focus.up
-actions.focus_management+=/cobra_shot,if=focus_time_to_max<=1.5&debuff.serpent_sting.remains>4
+# Focus management optimization using state expressions
+actions.focus_management+=/steady_shot,if=should_steady_shot&focus>=14&(focus_time_to_max>3|!buff.steady_focus.up|buff.steady_focus.remains<=2)
+actions.focus_management+=/cobra_shot,if=should_cobra_shot&focus>=14&(focus_time_to_max<=1.5|debuff.serpent_sting.remains<=4)
 actions.focus_management+=/thrill_of_the_hunt_active,if=buff.thrill_of_the_hunt.up&focus<=40
 
 # Target switching and priority targeting
@@ -113,10 +113,9 @@ actions.burst+=/chimera_shot,if=debuff.serpent_sting.up&buff.rapid_fire.up
 actions.burst+=/arcane_shot,if=buff.rapid_fire.up&focus>=40
 actions.burst+=/multi_shot,if=buff.rapid_fire.up&active_enemies>=2&focus>=50
 
-# Low-focus filler priorities
-actions.filler+=/steady_shot,if=focus<=50&!buff.steady_focus.up
-actions.filler+=/steady_shot,if=buff.steady_focus.remains<=2&buff.steady_focus.up
-actions.filler+=/cobra_shot,if=focus>=30&debuff.serpent_sting.remains>3
+# Low-focus filler priorities using optimal shot rotation
+actions.filler+=/steady_shot,if=should_steady_shot&focus>=14
+actions.filler+=/cobra_shot,if=should_cobra_shot&focus>=14
 actions.filler+=/arcane_shot,if=focus>=40&(buff.thrill_of_the_hunt.up|target.time_to_die<=10)
 actions.filler+=/aimed_shot,if=focus>=60&target.time_to_die<=15
 

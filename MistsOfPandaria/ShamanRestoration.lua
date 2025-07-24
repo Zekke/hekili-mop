@@ -196,7 +196,7 @@ spec:RegisterTalents( {
     astral_shift               = { 1, 3, 108271 }, -- 40% damage shifted to DoT for 6 sec
 
     -- Tier 2 (Level 30) - Utility/Control
-    frozen_power               = { 2, 1, 108196 }, -- Frost Shock roots targets for 5 sec
+    frozen_power               = { 2, 1, 63374 }, -- Frost Shock roots targets for 5 sec
     earthgrab_totem            = { 2, 2, 51485  }, -- Totem roots nearby enemies
     windwalk_totem             = { 2, 3, 108273 }, -- Removes movement impairing effects
 
@@ -213,7 +213,7 @@ spec:RegisterTalents( {
     -- Tier 5 (Level 75) - Healing/Support
     healing_tide_totem         = { 5, 1, 108280 }, -- Raid healing totem for 10 sec
     ancestral_guidance         = { 5, 2, 108281 }, -- Heals lowest health ally for 25% of damage dealt
-    conductivity               = { 5, 3, 108282 }, -- When you cast Healing Rain, you may cast Lightning Bolt, Chain Lightning, Lava Burst, or Elemental Blast on enemies standing in the area to heal all allies in the Healing Rain for 20% of the damage dealt.    conductivity               = { 2274, 1, 108282 }, -- Chain Lightning spread to 2 additional targets
+    conductivity               = { 5, 3, 108282 }, -- When you cast Healing Rain, you may cast Lightning Bolt, Chain Lightning, Lava Burst, or Elemental Blast on enemies standing in the area to heal all allies in the Healing Rain for 20% of the damage dealt.
     
     -- Tier 6 (Level 90) - Ultimate
     unleashed_fury             = { 6, 1, 117012 }, -- Enhances Unleash Elements effects

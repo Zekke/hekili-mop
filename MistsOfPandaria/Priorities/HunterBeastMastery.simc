@@ -72,17 +72,19 @@ actions.core_rotation+=/lynx_rush,if=talent.lynx_rush.enabled&pet.alive
 actions.core_rotation+=/powershot,if=talent.powershot.enabled
 actions.core_rotation+=/dire_beast,if=talent.dire_beast.enabled
 actions.core_rotation+=/serpent_sting,if=!debuff.serpent_sting.up
-actions.core_rotation+=/cobra_shot,if=debuff.serpent_sting.remains<=6
 actions.core_rotation+=/glaive_toss,if=talent.glaive_toss.enabled
 actions.core_rotation+=/arcane_shot,if=buff.bestial_wrath.up&focus>=35
 actions.core_rotation+=/arcane_shot,if=focus>=79
 actions.core_rotation+=/explosive_trap,if=!debuff.explosive_trap.up
-actions.core_rotation+=/cobra_shot
+# Optimal shot rotation using state expressions
+actions.core_rotation+=/cobra_shot,if=should_cobra_shot&focus>=14
+actions.core_rotation+=/steady_shot,if=should_steady_shot&focus>=14
  
 # AoE priority adjustments
 actions.aoe+=/multi_shot,if=active_enemies>=3
-actions.aoe+=/cobra_shot,if=debuff.serpent_sting.up&active_enemies>=2&active_enemies<=4
 actions.aoe+=/barrage,if=talent.barrage.enabled&active_enemies>=5&focus>=60
+actions.aoe+=/cobra_shot,if=should_cobra_shot&focus>=14&(debuff.serpent_sting.up|active_enemies>=2&active_enemies<=4)
+actions.aoe+=/steady_shot,if=should_steady_shot&focus>=14
 actions.aoe+=/glaive_toss,if=talent.glaive_toss.enabled&active_enemies>=2&focus>=15
 actions.aoe+=/explosive_trap,if=active_enemies>=4&!debuff.explosive_trap.up
 

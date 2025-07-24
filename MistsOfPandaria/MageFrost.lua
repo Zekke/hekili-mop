@@ -79,15 +79,18 @@ RegisterFrostCombatLogEvent("COMBAT_LOG_EVENT_UNFILTERED", function(event, ...)
     
     -- FROST PROC TRACKING
     if subEvent == "SPELL_AURA_APPLIED" then
-        if spellId == 57761 then -- Brain Freeze
+        if spellId == 44549 then -- Brain Freeze (correct spell ID)
             brain_freeze_procs = brain_freeze_procs + 1
             ns.last_brain_freeze = now
+            applyBuff( "brain_freeze" )
         elseif spellId == 44544 then -- Fingers of Frost
             fingers_of_frost_procs = fingers_of_frost_procs + 1
             ns.last_fingers_of_frost = now
+            applyBuff( "fingers_of_frost" )
         elseif spellId == 12472 then -- Icy Veins
             icy_veins_activations = icy_veins_activations + 1
             ns.last_icy_veins = now
+            applyBuff( "icy_veins" )
         end
     end
     
@@ -246,17 +249,34 @@ spec:RegisterGear( "tier16_4pc", nil, {
     generate = check_tier_bonus("tier16", 4)
 } )
 
+-- Spell Power Calculations and State Expressions
+spec:RegisterStateExpr( "spell_power", function()
+    return GetSpellBonusDamage(5) -- Frost school
+end )
+
+spec:RegisterStateExpr( "brain_freeze_bonus", function()
+    return buff.brain_freeze.up and 0.2 or 0 -- 20% damage bonus
+end )
+
+spec:RegisterStateExpr( "fingers_of_frost_bonus", function()
+    return buff.fingers_of_frost.up and 0.15 or 0 -- 15% damage bonus
+end )
+
+spec:RegisterStateExpr( "icy_veins_bonus", function()
+    return buff.icy_veins.up and 0.2 or 0 -- 20% damage bonus
+end )
+
 -- Talents (MoP 6-tier system)
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Mobility/Instant Cast
     presence_of_mind      = { 1, 1, 12043 }, -- Your next 3 spells are instant cast
-    blazing_speed         = { 2, 1, 108843 }, -- Increases movement speed by 150% for 1.5 sec after taking damage
-    ice_floes             = { 3, 1, 108839 }, -- Allows you to cast 3 spells while moving
+    blazing_speed         = { 1, 2, 108843 }, -- Increases movement speed by 150% for 1.5 sec after taking damage
+    ice_floes             = { 1, 3, 108839 }, -- Allows you to cast 3 spells while moving
 
     -- Tier 2 (Level 30) - Survivability
-    flameglow             = { 2, 2, 140468 }, -- Reduces spell damage taken by a fixed amount
-    ice_barrier           = { 2, 3, 11426 }, -- Absorbs damage for 1 min
-    temporal_shield       = { 3, 3, 115610 }, -- 100% of damage taken is healed back over 6 sec
+    flameglow             = { 2, 1, 140468 }, -- Reduces spell damage taken by a fixed amount
+    ice_barrier           = { 2, 2, 11426 }, -- Absorbs damage for 1 min
+    temporal_shield       = { 2, 3, 115610 }, -- 100% of damage taken is healed back over 6 sec
 
     -- Tier 3 (Level 45) - Control
     ring_of_frost         = { 3, 1, 113724 }, -- Incapacitates enemies entering the ring
@@ -988,6 +1008,7 @@ spec:RegisterAbilities( {
         handler = function()
             -- Chance to proc Fingers of Frost
             -- Chance to proc Brain Freeze for Frostfire Bolt
+            -- Brain Freeze has a chance to proc on each Frostbolt hit
         end,
     },
     
@@ -1069,7 +1090,7 @@ spec:RegisterAbilities( {
     
     frostfire_bolt = {
         id = 44614,
-        cast = 2,
+        cast = function() return buff.brain_freeze.up and 0 or 2 end, -- Instant when Brain Freeze active
         cooldown = 0,
         gcd = "spell",
         
@@ -1079,7 +1100,7 @@ spec:RegisterAbilities( {
         startsCombat = true,
         texture = 237520,
         
-        buff = "brain_freeze",
+        usable = function() return buff.brain_freeze.up, "requires brain freeze proc" end,
         
         handler = function()
             removeBuff( "brain_freeze" )

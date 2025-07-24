@@ -7,7 +7,7 @@ local _, playerClass = UnitClass('player')
 if playerClass ~= 'ROGUE' then return end
 
 local addon, ns = ...
-local Hekili = _G[ addon ]
+local Hekili = _G[ "Hekili" ]
 local class, state = Hekili.Class, Hekili.State
 
 local floor = math.floor
@@ -20,8 +20,183 @@ if not state then
     state = Hekili.State 
 end
 
-spec:RegisterResource( 3 ) -- Energy
-spec:RegisterResource( 4 ) -- ComboPoints 
+-- Enhanced resource registration for Combat Rogue with signature mechanics
+spec:RegisterResource( 3, { -- Energy with Combat-specific enhancements
+    -- Adrenaline Rush energy bonus (Combat signature cooldown)
+    adrenaline_rush = {
+        aura = "adrenaline_rush",
+        last = function ()
+            local app = state.buff.adrenaline_rush.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 1 ) * 1
+        end,
+        interval = 1,
+        value = function()
+            -- Adrenaline Rush doubles energy regeneration (Combat signature)
+            return state.buff.adrenaline_rush.up and 10 or 0 -- Additional 10 energy per second
+        end,
+    },
+    
+    -- Combat Potency proc energy (Combat passive) - MoP: 20% chance for 15 energy on off-hand hit
+    combat_potency = {
+        last = function ()
+            return state.query_time -- Continuous proc chance tracking
+        end,
+        interval = 0.5, -- Off-hand attacks happen roughly every 0.5 seconds with dual-wield
+        value = function()
+            if not state.combat then return 0 end
+            
+            -- Combat Potency: 20% chance to gain 15 energy on off-hand hit
+            -- More accurate simulation based on weapon speed and proc chance
+            local weapon_speed = state.swings.offhand_speed or 2.6
+            local attacks_per_second = 1 / weapon_speed
+            local proc_chance = 0.20 -- 20% proc chance
+            local energy_per_proc = 15
+            
+            -- Expected energy per second = attacks_per_second * proc_chance * energy_per_proc
+            return attacks_per_second * proc_chance * energy_per_proc
+        end,
+    },
+    
+    -- Shadow Focus talent energy reduction mechanics
+    shadow_focus = {
+        aura = "stealth",
+        last = function ()
+            return state.buff.stealth.applied or state.buff.vanish.applied or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Shadow Focus reduces energy costs while stealthed
+            return (state.buff.stealth.up or state.buff.vanish.up) and 3 or 0 -- +3 energy per second while stealthed
+        end,
+    },
+    
+    -- Blade Flurry energy efficiency
+    blade_flurry = {
+        aura = "blade_flurry",
+        last = function ()
+            local app = state.buff.blade_flurry.applied
+            local t = state.query_time
+            return app + floor( ( t - app ) / 1 ) * 1
+        end,
+        interval = 1,
+        value = function()
+            -- Slight energy efficiency bonus during Blade Flurry
+            return state.buff.blade_flurry.up and 1 or 0 -- +1 energy per second during Blade Flurry
+        end,
+    },
+    
+    -- Relentless Strikes energy return (Combat gets good benefit)
+    relentless_strikes_energy = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Relentless Strikes: 20% chance per combo point spent to generate 25 energy
+            if state.talent.relentless_strikes.enabled and state.last_finisher_cp then
+                local energy_chance = state.last_finisher_cp * 0.04 -- 4% chance per combo point for energy return
+                return math.random() < energy_chance and 25 or 0
+            end
+            return 0
+        end,
+    },
+}, {
+    -- Enhanced base energy regeneration for Combat with MoP mechanics
+    base_regen = function ()
+        local base = 10 -- Base energy regeneration in MoP (10 energy per second)
+        
+        -- Haste scaling for energy regeneration (minor in MoP)
+        local haste_bonus = 1.0 + ((state.stat.haste_rating or 0) / 42500) -- Approximate haste scaling
+        
+        -- Combat doesn't get inherent energy regeneration bonuses like other specs
+        return base * haste_bonus
+    end,
+    
+    -- Blade Flurry energy efficiency during cleave
+    blade_flurry_efficiency = function ()
+        return state.buff.blade_flurry.up and 1.05 or 1.0 -- 5% energy efficiency during Blade Flurry
+    end,
+    
+    -- Glyph of Energy enhanced regeneration
+    glyph_energy_bonus = function ()
+        return state.glyph.energy.enabled and 1.05 or 1.0 -- 5% energy regen bonus if glyphed
+    end,
+} )
+
+-- Combo Points resource registration with Combat-specific mechanics
+spec:RegisterResource( 4, { -- Combo Points = 4 in MoP
+    -- Bandit's Guile combo point synergy (Combat passive)
+    bandits_guile = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Bandit's Guile doesn't generate combo points directly but affects their efficiency
+            local insight_bonus = 0
+            if state.buff.shallow_insight.up then insight_bonus = 0.1
+            elseif state.buff.moderate_insight.up then insight_bonus = 0.2
+            elseif state.buff.deep_insight.up then insight_bonus = 0.3
+            end
+            return insight_bonus -- Effective combo point value multiplier
+        end,
+    },
+    
+    -- Restless Blades combo point consumption tracking
+    restless_blades_cd_reduction = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Track combo points spent for Restless Blades cooldown reduction
+            if state.talent.restless_blades.enabled and state.last_finisher_cp then
+                return -state.last_finisher_cp -- Negative to track consumption for CDR
+            end
+            return 0
+        end,
+    },
+    
+    -- Ruthlessness combo point retention (Combat gets good benefit)
+    ruthlessness_retention = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Ruthlessness: 20% chance per combo point spent to not consume a combo point
+            if state.talent.ruthlessness.enabled and state.last_finisher_cp then
+                local retention_chance = state.last_finisher_cp * 0.2
+                return math.random() < retention_chance and 1 or 0
+            end
+            return 0
+        end,
+    },
+    
+    -- Marked for Death instant combo points (if talented)
+    marked_for_death_generation = {
+        last = function ()
+            return state.last_cast_time.marked_for_death or 0
+        end,
+        interval = 1,
+        value = function()
+            -- Marked for Death instantly generates 5 combo points
+            return state.last_ability == "marked_for_death" and 5 or 0
+        end,
+    },
+}, {
+    -- Base combo point mechanics for Combat
+    max_combo_points = function ()
+        return 5 -- Maximum 5 combo points in MoP
+    end,
+    
+    -- Combat's enhanced combo point efficiency
+    combat_efficiency = function ()
+        return 1.0 -- Combat doesn't get inherent combo point generation bonuses
+    end,
+} )
+
 -- Talents
 spec:RegisterTalents( {
     -- Tier 1 (Level 15)
@@ -126,7 +301,7 @@ spec:RegisterAuras( {
     -- Core Combat Rogue buffs
     slice_and_dice = {
         id = 5171,
-        duration = function() return 12 + (talent.improved_slice_and_dice.enabled and 6 or 0) end,
+        duration = function() return 6 + (6 * combo_points.current) + (talent.improved_slice_and_dice.enabled and 6 or 0) end, -- MoP Classic: 6s base + 6s per combo point + talent bonus
         max_stack = 1
     },
     adrenaline_rush = {
@@ -178,7 +353,7 @@ spec:RegisterAuras( {
     },
     rupture = {
         id = 1943,
-        duration = function() return 16 + (2 * combo_points.current) end,
+        duration = function() return 8 + (4 * combo_points.current) end, -- MoP Classic: 8s base + 4s per combo point
         tick_time = 2,
         max_stack = 1
     },
@@ -206,7 +381,7 @@ spec:RegisterAuras( {
     },
     kidney_shot = {
         id = 408,
-        duration = function() return 2 + combo_points.current end,
+        duration = function() return 1 + combo_points.current end, -- MoP Classic: 1s base + 1s per combo point
         max_stack = 1
     },
     cheap_shot = {
@@ -726,20 +901,30 @@ spec:RegisterAbilities( {
                 end
             end
             
-            -- Bandit's Guile tracking
-            if buff.bandits_guile.stack < 12 then
-                addStack("bandits_guile", nil, 1)
+            -- Bandit's Guile tracking - MoP: Every Sinister Strike and Revealing Strike builds stacks
+            if not buff.bandits_guile.up then
+                applyBuff("bandits_guile", 15, 1) -- Start with 1 stack, 15 second duration
             else
-                -- Cycle through Insight buffs
-                if not buff.shallow_insight.up and not buff.moderate_insight.up and not buff.deep_insight.up then
-                    applyBuff("shallow_insight")
-                elseif buff.shallow_insight.up and buff.bandits_guile.stack >= 4 then
-                    removeBuff("shallow_insight")
-                    applyBuff("moderate_insight")
-                elseif buff.moderate_insight.up and buff.bandits_guile.stack >= 8 then
-                    removeBuff("moderate_insight")
-                    applyBuff("deep_insight")
+                if buff.bandits_guile.stack < 4 then
+                    addStack("bandits_guile", 15, 1) -- Add stack and refresh duration
                 end
+            end
+            
+            -- Cycle through Insight buffs based on stack count
+            if buff.bandits_guile.stack == 4 and not buff.shallow_insight.up then
+                applyBuff("shallow_insight", 15) -- 10% damage increase
+                removeBuff("moderate_insight")
+                removeBuff("deep_insight")
+            elseif buff.bandits_guile.stack == 8 and not buff.moderate_insight.up then
+                applyBuff("moderate_insight", 15) -- 20% damage increase
+                removeBuff("shallow_insight")
+                removeBuff("deep_insight")
+            elseif buff.bandits_guile.stack == 12 and not buff.deep_insight.up then
+                applyBuff("deep_insight", 15) -- 30% damage increase
+                removeBuff("shallow_insight")
+                removeBuff("moderate_insight")
+                -- Reset the stack counter to maintain Deep Insight
+                buff.bandits_guile.stack = 12
             end
             
             -- Tier bonuses
@@ -765,6 +950,32 @@ spec:RegisterAbilities( {
         handler = function ()
             applyDebuff("target", "revealing_strike")
             gain(1, "combo_points")
+            
+            -- Bandit's Guile tracking - MoP: Every Sinister Strike and Revealing Strike builds stacks
+            if not buff.bandits_guile.up then
+                applyBuff("bandits_guile", 15, 1) -- Start with 1 stack, 15 second duration
+            else
+                if buff.bandits_guile.stack < 4 then
+                    addStack("bandits_guile", 15, 1) -- Add stack and refresh duration
+                end
+            end
+            
+            -- Cycle through Insight buffs based on stack count
+            if buff.bandits_guile.stack == 4 and not buff.shallow_insight.up then
+                applyBuff("shallow_insight", 15) -- 10% damage increase
+                removeBuff("moderate_insight")
+                removeBuff("deep_insight")
+            elseif buff.bandits_guile.stack == 8 and not buff.moderate_insight.up then
+                applyBuff("moderate_insight", 15) -- 20% damage increase
+                removeBuff("shallow_insight")
+                removeBuff("deep_insight")
+            elseif buff.bandits_guile.stack == 12 and not buff.deep_insight.up then
+                applyBuff("deep_insight", 15) -- 30% damage increase
+                removeBuff("shallow_insight")
+                removeBuff("moderate_insight")
+                -- Reset the stack counter to maintain Deep Insight
+                buff.bandits_guile.stack = 12
+            end
         end,
     },
     
@@ -796,8 +1007,9 @@ spec:RegisterAbilities( {
                 reduceCooldown("redirect", cdr)
             end
             
-            -- Consume combo points
+            -- Consume combo points and track for talents
             spend(cp, "combo_points")
+            state.last_finisher_cp = cp
             
             -- Handle Anticipation talent
             if talent.anticipation.enabled and buff.anticipation.stack > 0 then
@@ -825,8 +1037,8 @@ spec:RegisterAbilities( {
         handler = function ()
             local cp = combo_points.current
             
-            -- Duration based on combo points (4 sec base + 4 sec per combo point)
-            applyDebuff("target", "rupture", 4 + 4 * cp)
+            -- MoP Classic: 8 seconds base + 4 seconds per combo point
+            applyDebuff("target", "rupture", 8 + (4 * cp))
             
             -- Apply Restless Blades cooldown reduction
             local cdr = restless_blades_cdr(cp)
@@ -838,8 +1050,9 @@ spec:RegisterAbilities( {
                 reduceCooldown("redirect", cdr)
             end
             
-            -- Consume combo points
+            -- Consume combo points and track for talents
             spend(cp, "combo_points")
+            state.last_finisher_cp = cp
             
             -- Handle Anticipation talent
             if talent.anticipation.enabled and buff.anticipation.stack > 0 then
@@ -867,8 +1080,8 @@ spec:RegisterAbilities( {
         handler = function ()
             local cp = combo_points.current
             
-            -- Duration: 12 sec + 6 sec per combo point
-            applyBuff("slice_and_dice", 12 + 6 * cp)
+            -- MoP Classic: 6 seconds base + 6 seconds per combo point
+            applyBuff("slice_and_dice", 6 + (6 * cp))
             
             -- Apply Restless Blades cooldown reduction
             local cdr = restless_blades_cdr(cp)
@@ -880,7 +1093,7 @@ spec:RegisterAbilities( {
                 reduceCooldown("redirect", cdr)
             end
             
-            -- Consume combo points
+            -- Consume combo points and track for talents
             spend(cp, "combo_points")
             
             -- Handle Anticipation talent
@@ -1173,7 +1386,8 @@ spec:RegisterAbilities( {
 
         handler = function ()
             local cp = combo_points.current
-            applyDebuff("target", "kidney_shot", 2 + cp)
+            -- MoP Classic: 1 second base + 1 second per combo point
+            applyDebuff("target", "kidney_shot", 1 + cp)
             
             -- Nerve Strike talent
             if talent.nerve_strike.enabled then
@@ -1195,8 +1409,9 @@ spec:RegisterAbilities( {
                 reduceCooldown("redirect", cdr)
             end
             
-            -- Consume combo points
+            -- Consume combo points and track for talents
             spend(cp, "combo_points")
+            state.last_finisher_cp = cp
         end,
     },
     

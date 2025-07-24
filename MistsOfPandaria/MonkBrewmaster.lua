@@ -52,11 +52,85 @@ local function RegisterBrewmasterSpec()
         end)
     end
 
-    --[[
-        Resource registration for Energy (3) and Chi (12).
-    ]]
-    spec:RegisterResource(3, {}) -- Energy
-    spec:RegisterResource(12, -- Chi
+    -- Enhanced resource registration for Brewmaster Monk
+    spec:RegisterResource(3, { -- Energy with Brewmaster-specific mechanics
+        -- Energizing Brew energy restoration (Brewmaster signature cooldown)
+        energizing_brew = {
+            aura = "energizing_brew",
+            last = function ()
+                local app = state.buff.energizing_brew.applied
+                local t = state.query_time
+                return app + floor( ( t - app ) / 1 ) * 1
+            end,
+            interval = 1,
+            value = function()
+                -- Energizing Brew provides massive energy boost
+                return state.buff.energizing_brew.up and 20 or 0 -- +20 energy per second during Energizing Brew
+            end,
+        },
+        
+        -- Chi Brew energy boost (if talented)
+        chi_brew = {
+            aura = "chi_brew_energy",
+            last = function ()
+                local app = state.buff.chi_brew_energy.applied
+                local t = state.query_time
+                return app + floor( ( t - app ) / 1 ) * 1
+            end,
+            interval = 1,
+            value = function()
+                -- Chi Brew provides energy alongside Chi
+                return state.buff.chi_brew_energy.up and 15 or 0 -- +15 energy per second briefly after Chi Brew
+            end,
+        },
+        
+        -- Tiger Palm energy refund mechanics
+        tiger_palm_efficiency = {
+            last = function ()
+                return state.query_time -- Continuous tracking
+            end,
+            interval = 1,
+            value = function()
+                -- Tiger Palm reduces energy costs of other abilities
+                return state.buff.tiger_power.up and 1 or 0 -- +1 energy per second with Tiger Power active
+            end,
+        },
+        
+        -- Ascension talent bonus (if talented)
+        ascension = {
+            last = function ()
+                return state.query_time -- Continuous passive
+            end,
+            interval = 1,
+            value = function()
+                -- Ascension provides passive energy bonus
+                return state.talent.ascension.enabled and 2 or 0 -- +2 energy per second with Ascension
+            end,
+        },
+    }, {
+        -- Enhanced base energy regeneration for MoP Brewmaster
+        base_regen = 10, -- Base 10 energy per second in MoP
+        haste_scaling = false, -- Energy doesn't scale with haste in MoP
+        
+        regenerates = function()
+            local base = 10 -- Standard energy regen
+            local bonus = 0
+            
+            -- Stance-specific bonuses
+            if state.buff.stance_of_the_sturdy_ox.up then
+                bonus = bonus + 1 -- +1 energy per second in Ox Stance
+            end
+            
+            -- Combat efficiency
+            if state.combat then
+                bonus = bonus + 1 -- +1 energy per second in combat (Monk training)
+            end
+            
+            return base + bonus
+        end,
+    } )
+    
+    spec:RegisterResource(12, -- Chi (secondary resource for Brewmaster)
         {},
         {
             max = function() return state.talent.ascension.enabled and 5 or 4 end
@@ -96,7 +170,7 @@ local function RegisterBrewmasterSpec()
     spec:RegisterTalents({
         celerity        = { 1, 1, 115173 },
         tigers_lust     = { 1, 2, 116841 },
-        momentum        = { 1, 3, 115294 },
+        momentum        = { 1, 3, 115174 },
         chi_wave        = { 2, 1, 115098 },
         zen_sphere      = { 2, 2, 124081 },
         chi_burst       = { 2, 3, 123986 },

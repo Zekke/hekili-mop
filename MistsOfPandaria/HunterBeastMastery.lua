@@ -21,58 +21,83 @@ local spec = Hekili:NewSpecialization( 253, true )
     -- Use MoP power type numbers instead of Enum
     -- Focus = 2 in MoP Classic
     spec:RegisterResource( 2, {
+                -- Steady Shot focus generation (MoP standard: generates 14 focus)
         steady_shot = {
             resource = "focus",
-            cast = function(x) return x > 0 and x or nil end,
-            aura = function(x) return x > 0 and "casting" or nil end,
-            
             last = function()
-                return state.buff.casting.applied
+                local app = (state.last_cast_time and state.last_cast_time.steady_shot) or 0
+                local t = state.query_time
+                return app + floor( ( t - app ) / 2.0 ) * 2.0
             end,
-            
-            interval = function() return state.buff.casting.duration end,
-            value = 14,
+            interval = function() return 2.0 / state.haste end, -- Standard 2.0s cast time in MoP
+            value = 14, -- Steady Shot generates 14 focus in MoP
         },
-        
+
+        -- Cobra Shot focus generation (MoP standard: generates 14 focus)
         cobra_shot = {
             resource = "focus",
-            cast = function(x) return x > 0 and x or nil end,
-            aura = function(x) return x > 0 and "casting" or nil end,
-            
             last = function()
-                return state.buff.casting.applied
+                local app = (state.last_cast_time and state.last_cast_time.cobra_shot) or 0
+                local t = state.query_time
+                return app + floor( ( t - app ) / 2.0 ) * 2.0
             end,
-            
-            interval = function() return state.buff.casting.duration end,
-            value = 14,
+            interval = function() return 2.0 / state.haste end, -- Cast time
+            value = 14, -- Cobra Shot generates 14 focus in MoP
         },
         
+        -- Dire Beast focus generation (BM signature talent)
         dire_beast = {
             resource = "focus",
             aura = "dire_beast",
-            
             last = function()
                 local app = state.buff.dire_beast.applied
                 local t = state.query_time
-                
                 return app + floor( ( t - app ) / 2 ) * 2
             end,
-            
             interval = 2,
-            value = 5,
+            value = 5, -- Dire Beast generates 5 focus every 2 seconds (BM gets more than other specs)
         },
         
+        -- Fervor talent focus restoration
         fervor = {
             resource = "focus",
             aura = "fervor",
-            
             last = function()
-                return state.buff.fervor.applied
+                local app = state.buff.fervor.applied
+                local t = state.query_time
+                return app + floor( ( t - app ) / 1 ) * 1
             end,
+            interval = 1,
+            value = function() return state.buff.fervor.up and 50 or 0 end, -- Instant 50 focus
+        },
+    }, {
+        -- Enhanced base focus regeneration for MoP
+        base_regen = 6, -- Base 6 focus per second in MoP
+        haste_scaling = true,
+        
+        regenerates = function()
+            local base = 6 * state.haste
+            local bonus = 0
             
-            interval = 0.1,
-            value = 50,
-        }
+            -- Aspect bonuses
+            if state.buff.aspect_of_the_iron_hawk.up then
+                bonus = bonus + 0.3 -- 30% increased focus regen
+            elseif state.buff.aspect_of_the_hawk.up then
+                bonus = bonus + 0.15 -- 15% increased focus regen
+            end
+            
+            -- Rapid Fire bonus
+            if state.buff.rapid_fire.up then
+                bonus = bonus + 0.5 -- 50% increased focus regen during Rapid Fire
+            end
+            
+            -- Bestial Wrath focus efficiency (BM specific)
+            if state.buff.bestial_wrath.up then
+                bonus = bonus + 0.25 -- 25% increased focus regen during Bestial Wrath
+            end
+            
+            return base * (1 + bonus)
+        end,
     } )
 
     -- Talents
@@ -80,7 +105,7 @@ local spec = Hekili:NewSpecialization( 253, true )
         -- Tier 1 (Level 15)
         posthaste = { 1, 1, 109215 }, -- Disengage also frees you from all movement impairing effects and increases your movement speed by 60% for 4 sec.
         narrow_escape = { 1, 2, 109298 }, -- When Disengage is activated, you also activate a web trap which encases all targets within 8 yards in sticky webs, preventing movement for 8 sec. Damage caused may interrupt the effect.
-        crouching_tiger_hidden_chimera = { 1, 3, 109215 }, -- Reduces the cooldown of Disengage by 6 sec and Deterrence by 10 sec.
+        crouching_tiger_hidden_chimera = { 1, 3, 118675 }, -- Reduces the cooldown of Disengage by 6 sec and Deterrence by 10 sec.
 
         -- Tier 2 (Level 30)
         silencing_shot = { 2, 1, 34490 }, -- Interrupts spellcasting and prevents any spell in that school from being cast for 3 sec.
@@ -100,7 +125,7 @@ local spec = Hekili:NewSpecialization( 253, true )
         -- Tier 5 (Level 75)
         blink_strikes = { 5, 1, 130392 }, -- Your pet's Basic Attacks deal 50% increased damage and can be used from 30 yards away. Their range is increased to 40 yards while Dash or Stampede is active.
         lynx_rush = { 5, 2, 120697 }, -- Commands your pet to rush the target, performing 9 attacks in 4 sec for 800% normal damage. Each hit deals bleed damage to the target over 8 sec. Bleeds stack and persist on the target.
-        thrill_of_the_hunt = { 5, 3, 109306 }, -- You have a 30% chance when you hit with Multi-Shot or Arcane Shot to make your next Steady Shot or Cobra Shot cost no Focus and deal 150% additional damage.
+        thrill_of_the_hunt = { 5, 3, 34720 }, -- You have a 30% chance when you hit with Multi-Shot or Arcane Shot to make your next Steady Shot or Cobra Shot cost no Focus and deal 150% additional damage.
 
         -- Tier 6 (Level 90)
         glaive_toss = { 6, 1, 117050 }, -- Throws a pair of glaives at your target, dealing Physical damage and reducing movement speed by 30% for 3 sec. The glaives return to you, also dealing damage to any enemies in their path.
@@ -292,7 +317,7 @@ spec:RegisterGlyphs( {
         },
         -- Talent: Next Steady Shot or Cobra Shot costs no Focus and deals additional damage.
         thrill_of_the_hunt = {
-            id = 109306,
+            id = 34720,
             duration = 20,
             max_stack = 1
         },
@@ -407,6 +432,12 @@ spec:RegisterGlyphs( {
             duration = 8,
             max_stack = 5
         },
+        focus_fire = {
+            id = 82692,
+            duration = 20,
+            max_stack = 5,  -- Stacks correspond to consumed frenzy stacks
+            copy = "focus_fire_buff"
+        },
         beast_cleave = {
             id = 115939,
             duration = 4,
@@ -472,6 +503,54 @@ spec:RegisterGlyphs( {
             max_stack = 1
         },
 
+        -- === PET ABILITY AURAS ===
+        -- Pet basic abilities
+        pet_dash = {
+            id = 61684,
+            duration = 16,
+            max_stack = 1,
+            generate = function( t )
+                if state.pet.alive then
+                    t.count = 1
+                    t.expires = 0
+                    t.applied = 0
+                    t.caster = "pet"
+                    return
+                end
+                t.count = 0
+                t.expires = 0
+                t.applied = 0
+                t.caster = "nobody"
+            end,
+        },
+        
+        pet_prowl = {
+            id = 24450,
+            duration = 3600,
+            max_stack = 1,
+            generate = function( t )
+                if state.pet.alive and state.pet.family == "cat" then
+                    t.count = 1
+                    t.expires = 0
+                    t.applied = 0
+                    t.caster = "pet"
+                    return
+                end
+                t.count = 0
+                t.expires = 0
+                t.applied = 0
+                t.caster = "nobody"
+            end,
+        },
+        
+        -- Pet debuffs on targets
+        growl = {
+            id = 2649,
+            duration = 3,
+            max_stack = 1,
+            type = "Taunt",
+        },
+
     } )
 
     spec:RegisterStateFunction( "apply_aspect", function( name )
@@ -519,11 +598,22 @@ end )
 end )
 
 spec:RegisterStateExpr( "should_focus_fire", function()
-    -- Use Focus Fire immediately at 5 stacks, or every 20 seconds at lower stacks
-    return pet.alive and (
-        buff.frenzy.stack >= 5 or 
-        (buff.frenzy.stack >= 1 and cooldown.focus_fire.remains == 0)
-    )
+    -- Enhanced Focus Fire logic for optimal Beast Mastery play
+    if not pet.alive or buff.frenzy.stack == 0 then return false end
+    
+    -- Always use at 5 stacks
+    if buff.frenzy.stack >= 5 then return true end
+    
+    -- Use at 3+ stacks if Bestial Wrath is on cooldown > 10s
+    if buff.frenzy.stack >= 3 and cooldown.bestial_wrath.remains > 10 then return true end
+    
+    -- Use at 2+ stacks if frenzy is about to expire (< 3s remaining)
+    if buff.frenzy.stack >= 2 and buff.frenzy.remains < 3 then return true end
+    
+    -- Never use during Bestial Wrath (waste of synergy)
+    if buff.bestial_wrath.up then return false end
+    
+    return false
 end )
 
 spec:RegisterStateExpr( "threat", function()
@@ -543,6 +633,71 @@ end )
 
     spec:RegisterStateExpr( "bloodlust", function()
         return buff.bloodlust
+    end )
+
+    -- Enhanced frenzy tracking for better Focus Fire timing
+    spec:RegisterStateExpr( "frenzy_duration_remaining", function()
+        return buff.frenzy.remains or 0
+    end )
+
+    spec:RegisterStateExpr( "can_generate_frenzy", function()
+        return pet.alive and buff.frenzy.stack < 5
+    end )
+
+    -- === SHOT ROTATION STATE EXPRESSIONS ===
+    
+    -- Determines if we should use Cobra Shot over Steady Shot
+    spec:RegisterStateExpr( "should_cobra_shot", function()
+        -- Cobra Shot is preferred for Beast Mastery when:
+        -- 1. We have Serpent Sting and need to maintain it
+        -- 2. We're in combat and need faster focus generation
+        -- 3. We have enough focus room to cast without capping
+        
+        if focus.current > 86 then return false end -- Don't cast if we'll cap focus
+        
+        -- Prefer Cobra Shot if Serpent Sting is up or about to expire
+        if debuff.serpent_sting.up and debuff.serpent_sting.remains < 6 then
+            return true
+        end
+        
+        -- Use Cobra Shot for general focus generation in BM
+        return true
+    end )
+    
+    -- Determines if we should use Steady Shot
+    spec:RegisterStateExpr( "should_steady_shot", function()
+        -- Beast Mastery should never use Steady Shot - always use Cobra Shot for focus generation
+        return false
+    end )
+    
+    -- Optimal focus threshold for casting focus spenders
+    spec:RegisterStateExpr( "focus_spender_threshold", function()
+        -- Beast Mastery focus thresholds:
+        -- Kill Command: 40 focus (highest priority)
+        -- Arcane Shot: 20 focus
+        -- Reserve at least 20 focus for emergency Kill Command
+        
+        if not pet.alive then return 80 end -- Higher threshold without pet
+        
+        -- During Bestial Wrath, be more aggressive
+        if buff.bestial_wrath.up then return 60 end
+        
+        -- Normal threshold allows for Kill Command priority
+        return 70
+    end )
+    
+    -- Determines if we're in an optimal shot weaving window
+    spec:RegisterStateExpr( "optimal_shot_window", function()
+        -- Optimal windows for shot rotation:
+        -- 1. Not during Bestial Wrath (save focus for Kill Command spam)
+        -- 2. When we have focus room
+        -- 3. When cooldowns aren't ready
+        
+        if buff.bestial_wrath.up then return false end
+        if focus.current < 30 then return false end
+        if cooldown.kill_command.ready and pet.alive then return false end
+        
+        return true
     end )
 
     -- Abilities
@@ -713,7 +868,7 @@ end )
 
         cobra_shot = {
             id = 77767,
-            cast = 2,
+            cast = function() return 2.0 / haste end,
             cooldown = 0,
             gcd = "spell",
             school = "nature",
@@ -726,6 +881,19 @@ end )
             handler = function ()
                 if buff.thrill_of_the_hunt.up then
                     removeBuff( "thrill_of_the_hunt" )
+                end
+                
+                -- Cobra Shot maintains Serpent Sting in MoP
+                if debuff.serpent_sting.up then
+                    debuff.serpent_sting.expires = debuff.serpent_sting.expires + 6
+                    if debuff.serpent_sting.expires > query_time + 15 then
+                        debuff.serpent_sting.expires = query_time + 15 -- Cap at max duration
+                    end
+                end
+                
+                -- Thrill of the Hunt proc chance (30% on focus-costing shots)
+                if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
+                    applyBuff( "thrill_of_the_hunt", 20 )
                 end
             end,
         },
@@ -855,7 +1023,12 @@ end )
             handler = function ()
                 local stacks = buff.frenzy.stack
                 removeBuff( "frenzy" )
-                -- Focus Fire converts frenzy stacks to haste
+                
+                -- Focus Fire converts frenzy stacks to haste buff
+                -- Each stack provides 3% haste for 20 seconds
+                if stacks > 0 then
+                    applyBuff( "focus_fire", 20, stacks )
+                end
             end,
         },
 
@@ -962,6 +1135,94 @@ end )
             end,
         },
 
+        -- === BASIC PET ABILITIES ===
+        pet_growl = {
+            id = 2649,
+            cast = 0,
+            cooldown = 5,
+            gcd = "off",
+            school = "physical",
+
+            startsCombat = true,
+
+            usable = function() return pet.alive, "requires a living pet" end,
+
+            handler = function ()
+                -- Pet taunt - forces target to attack pet
+                applyDebuff( "target", "growl", 3 )
+            end,
+        },
+
+        pet_claw = {
+            id = 16827,
+            cast = 0,
+            cooldown = 6,
+            gcd = "off",
+            school = "physical",
+
+            startsCombat = true,
+
+            usable = function() return pet.alive and pet.family == "cat", "requires cat pet" end,
+
+            handler = function ()
+                -- Basic cat attack with frenzy generation (10% chance)
+                if can_generate_frenzy and math.random() <= 0.1 then
+                    applyBuff( "frenzy", 8, min( 5, buff.frenzy.stack + 1 ) )
+                end
+            end,
+        },
+
+        pet_bite = {
+            id = 17253,
+            cast = 0,
+            cooldown = 6,
+            gcd = "off",
+            school = "physical",
+
+            startsCombat = true,
+
+            usable = function() return pet.alive and (pet.family == "wolf" or pet.family == "dog"), "requires wolf or dog pet" end,
+
+            handler = function ()
+                -- Basic canine attack with frenzy generation (10% chance)
+                if can_generate_frenzy and math.random() <= 0.1 then
+                    applyBuff( "frenzy", 8, min( 5, buff.frenzy.stack + 1 ) )
+                end
+            end,
+        },
+
+        pet_dash = {
+            id = 61684,
+            cast = 0,
+            cooldown = 30,
+            gcd = "off",
+            school = "physical",
+
+            startsCombat = false,
+
+            usable = function() return pet.alive, "requires a living pet" end,
+
+            handler = function ()
+                applyBuff( "pet_dash", 16 )
+            end,
+        },
+
+        pet_prowl = {
+            id = 24450,
+            cast = 0,
+            cooldown = 0,
+            gcd = "off",
+            school = "physical",
+
+            startsCombat = false,
+
+            usable = function() return pet.alive and pet.family == "cat", "requires cat pet" end,
+
+            handler = function ()
+                applyBuff( "pet_prowl" )
+            end,
+        },
+
         kill_shot = {
             id = 53351,
             cast = 0,
@@ -1057,18 +1318,19 @@ end )
             gcd = "spell",
             school = "physical",
 
-            spend = 30,
+            spend = 40, -- Standard MoP Multi-Shot cost
             spendType = "focus",
 
             startsCombat = true,
 
             handler = function ()
-                -- Multi-Shot effects
-                
-                -- 30% chance to proc Thrill of the Hunt
+                -- Thrill of the Hunt proc chance (30% chance in MoP)
                 if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
                     applyBuff( "thrill_of_the_hunt", 20 )
                 end
+                
+                -- Multi-Shot benefits from Beast Mastery's pet synergy
+                -- In MoP, Multi-Shot can trigger pet abilities and synergies
             end,
         },
 
@@ -1179,7 +1441,7 @@ end )
 
         steady_shot = {
             id = 56641,
-            cast = 2,
+            cast = function() return 2.0 / haste end,
             cooldown = 0,
             gcd = "spell",
             school = "physical",
@@ -1193,11 +1455,27 @@ end )
                 if buff.thrill_of_the_hunt.up then
                     removeBuff( "thrill_of_the_hunt" )
                 end
+                
+                -- Thrill of the Hunt proc chance (30% on focus-costing shots)
+                if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
+                    applyBuff( "thrill_of_the_hunt", 20 )
+                end
             end,
         },
 
+        -- === AUTO SHOT (PASSIVE) ===
+        auto_shot = {
+            id = 75,
+            cast = 0,
+            cooldown = function() return ranged_speed or 2.8 end,
+            gcd = "off",
+            school = "physical",
+            
+            startsCombat = true,
+        },
+
         thrill_of_the_hunt_active = {
-            id = 109306,
+            id = 34720, -- Corrected ID to match talent
             cast = 0,
             cooldown = 0,
             gcd = "off",

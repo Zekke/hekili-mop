@@ -33,8 +33,75 @@ local function UA_GetPlayerAuraBySpellID(spellID)
     return nil
 end
 
-spec:RegisterResource( 0 ) -- Mana = 0 in MoP
-spec:RegisterResource( 9 ) -- HolyPower = 9 in MoP
+spec:RegisterResource( 9, { -- Holy Power with Protection-specific mechanics
+    -- Grand Crusader reset proc (Protection signature)
+    grand_crusader = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Grand Crusader doesn't generate Holy Power directly, but resets Avenger's Shield
+            return 0 -- No direct HP generation, but tracks proc for ability resets
+        end,
+    },
+    
+    -- Bastion of Glory stack building (Protection mastery interaction)
+    bastion_of_glory = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            -- Tracks Bastion of Glory stacks for defensive benefit calculation
+            local stacks = state.buff.bastion_of_glory.stack or 0
+            return stacks * 0.1 -- Each stack provides defensive value
+        end,
+    },
+    
+    -- Shield of Vengeance proc (Protection talent)
+    shield_of_vengeance = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            if state.talent.shield_of_vengeance.enabled and state.last_ability == "word_of_glory" then
+                return 0 -- Shield of Vengeance procs from Holy Power consumption
+            end
+            return 0
+        end,
+    },
+    
+    -- Eternal Flame synergy (if talented)
+    eternal_flame_protection = {
+        last = function ()
+            return state.query_time
+        end,
+        interval = 1,
+        value = function()
+            if state.talent.eternal_flame.enabled and state.last_ability == "word_of_glory" then
+                return 0 -- Eternal Flame effectiveness scales with Holy Power spent
+            end
+            return 0
+        end,
+    },
+}, {
+    -- Base Holy Power mechanics for Protection
+    max_holy_power = function ()
+        return 3 -- Maximum 3 Holy Power in MoP
+    end,
+    
+    -- Protection's enhanced Holy Power generation
+    protection_generation = function ()
+        return 1.0 -- Standard HP generation rate
+    end,
+    
+    -- Divine Purpose proc effects for Protection
+    divine_purpose_efficiency = function ()
+        return state.talent.divine_purpose.enabled and (state.buff.divine_purpose.up and 1.5 or 1.0) or 1.0
+    end,
+} )
 
 -- Tier sets
 spec:RegisterGear( "tier14", 85345, 85346, 85347, 85348, 85349 ) -- T14 Protection Paladin Set
@@ -44,7 +111,7 @@ spec:RegisterGear( "tier15", 95268, 95270, 95266, 95269, 95267 ) -- T15 Protecti
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Movement
     speed_of_light            = { 1, 1, 85499  }, -- +70% movement speed for 8 sec
-    long_arm_of_the_law       = { 1, 2, 114158 }, -- Judgments increase movement speed by 45% for 3 sec
+    long_arm_of_the_law       = { 1, 2, 87172  }, -- Judgments increase movement speed by 45% for 3 sec
     pursuit_of_justice        = { 1, 3, 26023  }, -- +15% movement speed per Holy Power charge
 
     -- Tier 2 (Level 30) - Control

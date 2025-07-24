@@ -658,7 +658,7 @@ spec:RegisterTalents( {
     astral_shift               = { 1, 3, 108271 }, -- 40% damage shifted to DoT for 6 sec
 
     -- Tier 2 (Level 30) - Utility/Control
-    frozen_power               = { 2, 1, 108196 }, -- Frost Shock roots targets for 5 sec
+    frozen_power               = { 2, 1, 63374 }, -- Frost Shock roots targets for 5 sec
     earthgrab_totem            = { 2, 2, 51485  }, -- Totem roots nearby enemies
     windwalk_totem             = { 2, 3, 108273 }, -- Removes movement impairing effects
 

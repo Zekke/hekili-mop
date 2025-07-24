@@ -12,7 +12,7 @@ local class, state = Hekili.Class, Hekili.State
 
 local floor = math.floor
 local strformat = string.format
-local spec = Hekili:NewSpecialization( 73, true ) -- Survival spec ID for Hekili (255 = ranged in MoP Classic)
+local spec = Hekili:NewSpecialization( 73, true ) -- Protection spec ID for MoP (73 = melee tank in MoP Classic)
 
 
 -- Register resources with proper rage generation system from Cataclysm
@@ -25,9 +25,7 @@ local function rage_amount( isOffhand )
     return hit_factor * speed * rage_multiplier * (isOffhand and 0.5 or 1)
 end
 
-local ResourceInfo = ns.GetResourceInfo()
-
-spec:RegisterResource( ResourceInfo.rage, {
+spec:RegisterResource( 1, { -- Rage = 1 in MoP
     anger_management = {
         talent = "anger_management",
 
@@ -252,7 +250,7 @@ spec:RegisterGear( "tier16_4pc", function() return set_bonus.tier16_4pc end )
 -- Talents (MoP talent system - ID, enabled, spell_id)
 spec:RegisterTalents( {
     -- Tier 1 (Level 15) - Mobility
-    juggernaut                 = { 1, 1, 103156 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
+    juggernaut                 = { 1, 1, 103826 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and generates 15 Rage.
     double_time                = { 1, 2, 103827 }, -- Your Charge ability has 2 charges, shares charges with Intervene, and no longer generates Rage.
     warbringer                 = { 1, 3, 103828 }, -- Charge also roots the target for 4 sec, and Hamstring generates more Rage.
 
@@ -969,6 +967,25 @@ spec:RegisterAuras( {
         max_stack = 1,
     },
     
+    -- Shield Slam related auras
+    shield_slam_debuff = {
+        id = 23922, -- Shield Slam debuff on target
+        duration = 10,
+        max_stack = 1,
+    },
+    
+    shield_slam_silence = {
+        id = 58117, -- Glyph of Shield Slam silence effect
+        duration = 3,
+        max_stack = 1,
+    },
+    
+    shield_slam_threat = {
+        id = 23922, -- Threat multiplier buff for Shield Slam
+        duration = 3,
+        max_stack = 1,
+    },
+    
 } )
 
 -- Protection Warrior State Variables and Helper Functions
@@ -1124,7 +1141,7 @@ spec:RegisterAbilities( {
         cooldown = 6,
         gcd = "spell",
         
-        spend = -15, -- Generates 15 rage
+        spend = -15, -- Generates 15 rage in MoP
         spendType = "rage",
         
         requires = "shield",
@@ -1132,7 +1149,28 @@ spec:RegisterAbilities( {
         texture = 132357,
         
         handler = function()
-            -- No specific effect other than rage generation
+            -- Shield Slam is Protection's signature ability
+            gain( 15, "rage" ) -- Explicit rage generation
+            
+            -- MoP: Shield Slam damage scales with block value
+            -- Apply Shield Slam debuff (reduces damage dealt)
+            applyDebuff( "target", "shield_slam_debuff", 10 )
+            
+            -- Shield Mastery: Chance for defensive benefits
+            if spec.protection and math.random() < 0.3 then
+                -- 30% chance to proc Shield Block charge refresh
+                if cooldown.shield_block.charges < 2 then
+                    cooldown.shield_block.charges = cooldown.shield_block.charges + 1
+                end
+            end
+            
+            -- Glyph of Shield Slam: Silence effect
+            if glyph.shield_slam.enabled then
+                applyDebuff( "target", "shield_slam_silence", 3 )
+            end
+            
+            -- Apply brief threat multiplier (Protection specialty)
+            applyBuff( "shield_slam_threat", 3 ) -- Brief threat boost
         end,
     },
     
