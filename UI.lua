@@ -1590,6 +1590,9 @@ if self.HasRecommendations then
                                     b.Texture:SetVertexColor(1.0, 1.0, 1.0, 1.0)
                                     b.unusable = false
                                 end
+                                if IsAddOnLoaded("ZTB_classic") then
+                                    ZTB.PixelFrame:ChangeColor(b.Ability.id, not b.unusable, b.outOfRange)
+                                end
                             end
 
                             if desaturated and not b.desaturated then
@@ -1652,6 +1655,9 @@ if self.HasRecommendations then
 
             if preAlpha > 0 and newAlpha == 0 then
                 -- self:Deactivate()
+                if IsAddOnLoaded("ZTB_classic") then
+                    ZTB.PixelFrame:Hide();
+                end
                 self:SetAlpha( 0 )
                 self.alphaCheck = 0.5
             else
