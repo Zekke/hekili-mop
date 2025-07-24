@@ -579,6 +579,11 @@ end )
                 if buff.thrill_of_the_hunt.up then
                     removeBuff( "thrill_of_the_hunt" )
                 end
+                
+                -- 30% chance to proc Thrill of the Hunt
+                if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
+                    applyBuff( "thrill_of_the_hunt", 20 )
+                end
             end,
         },
 
@@ -1059,6 +1064,11 @@ end )
 
             handler = function ()
                 -- Multi-Shot effects
+                
+                -- 30% chance to proc Thrill of the Hunt
+                if talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then
+                    applyBuff( "thrill_of_the_hunt", 20 )
+                end
             end,
         },
 

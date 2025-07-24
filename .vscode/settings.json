@@ -118,7 +118,21 @@
         "pet",
         "class",
         "level",
-        "apply_aspect"
+        "apply_aspect",
+        "talent",
+        "focus",
+        "set_bonus",
+        "health",
+        "ranged_speed",
+        "cooldown",
+        "UnitBuff",
+        "enemies",
+        "target",
+        "GetSpellInfo",
+        "mana",
+        "shadow_orb",
+        "combo_points",
+        "reduceCooldown"
     ],
     "Lua.runtime.version": "Lua 5.1",
     "Lua.runtime.builtin": {

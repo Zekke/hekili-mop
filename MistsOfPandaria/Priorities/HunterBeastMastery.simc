@@ -34,7 +34,7 @@ actions+=/call_action_list,name=focus_management
 actions+=/call_action_list,name=filler
 
 # Situational action lists
-actions+=/call_action_list,name=aoe
+actions+=/call_action_list,name=aoe,if=active_enemies>3
 actions+=/call_action_list,name=movement,if=movement.distance>=5
 actions+=/call_action_list,name=defensive,if=incoming_damage_5s>health.max*0.3
 actions+=/call_action_list,name=pet_management
@@ -50,7 +50,9 @@ actions.cooldowns+=/a_murder_of_crows,if=talent.a_murder_of_crows.enabled&(buff.
 actions.cooldowns+=/lynx_rush,if=talent.lynx_rush.enabled&pet.alive&(buff.bestial_wrath.up|target.time_to_die<=15)
 actions.cooldowns+=/dire_beast,if=talent.dire_beast.enabled&(focus_deficit>=40|buff.bestial_wrath.up)
 actions.cooldowns+=/fervor,if=talent.fervor.enabled&focus<=37
-
+# Trinkets
+actions.cooldowns+=/use_item,slot=trinket1
+actions.cooldowns+=/use_item,slot=trinket2
 # Focus Fire priority (adapted from interface priority list)
 actions.focus_fire_management+=/focus_fire,if=pet.alive&buff.frenzy.stack>=5&!buff.bestial_wrath.up&cooldown.bestial_wrath.remains>5
 actions.focus_fire_management+=/bestial_wrath,if=pet.alive

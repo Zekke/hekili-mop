@@ -19,6 +19,31 @@ local strformat = string.format
 
     local spec = Hekili:NewSpecialization( 255, true )
 
+-- Combat log tracking for Survival mechanics
+local survivalCombatLogEvents = {}
+
+local function RegisterSurvivalCombatLogEvent(event, callback)
+    if not survivalCombatLogEvents[event] then
+        survivalCombatLogEvents[event] = {}
+    end
+    table.insert(survivalCombatLogEvents[event], callback)
+end
+
+-- Combat log frame for Survival-specific tracking
+local survivalCombatLogFrame = CreateFrame("Frame")
+survivalCombatLogFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+survivalCombatLogFrame:SetScript("OnEvent", function(self, event)
+    local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = CombatLogGetCurrentEventInfo()
+    
+    if sourceGUID == UnitGUID("player") then
+        if survivalCombatLogEvents[subevent] then
+            for _, callback in ipairs(survivalCombatLogEvents[subevent]) do
+                callback(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, select(12, CombatLogGetCurrentEventInfo()))
+            end
+        end
+    end
+end)
+
     -- Use MoP power type numbers instead of Enum
     -- Focus = 2 in MoP Classic
     spec:RegisterResource( 2, {
@@ -96,7 +121,7 @@ local strformat = string.format
         -- Tier 4 (Level 60)
         fervor = { 4, 1, 82726 }, -- Instantly resets the cooldown on your Kill Command and causes you and your pet to generate 50 Focus over 3 sec.
         dire_beast = { 4, 2, 120679 }, -- Summons a powerful wild beast that attacks your target and roars, increasing your Focus regeneration by 50% for 8 sec.
-        thrill_of_the_hunt = { 4, 3, 109306 }, -- Your successful Auto Shots have a 15% chance to make your next Arcane Shot, Chimera Shot, or Aimed Shot cost no Focus.
+        thrill_of_the_hunt = { 4, 3, 109306 }, -- Your successful Auto Shots have a 30% chance to make your next Arcane Shot, Chimera Shot, or Aimed Shot cost no Focus.
 
         -- Tier 5 (Level 75)
         a_murder_of_crows = { 5, 1, 131894 }, -- Sends a murder of crows to attack the target, dealing 0 Physical damage over 15 sec. If the target dies while under attack, A Murder of Crows' cooldown is reset.
@@ -412,13 +437,15 @@ spec:RegisterAuras( {
             cooldown = 0,
             gcd = "spell",
             
-            spend = 30,
+            spend = function () return buff.thrill_of_the_hunt.up and 0 or 30 end,
             spendType = "focus",
             
             startsCombat = true,
             
             handler = function ()
-                -- No special handling needed for MoP
+                if buff.thrill_of_the_hunt.up then
+                    removeBuff( "thrill_of_the_hunt" )
+                end
             end,
         },
         
@@ -1139,6 +1166,25 @@ spec:RegisterAuras( {
     spec:RegisterGear( "tier16", 99169, 99170, 99171, 99172, 99173 )
     spec:RegisterGear( "tier15", 95307, 95308, 95309, 95310, 95311 )
     spec:RegisterGear( "tier14", 84242, 84243, 84244, 84245, 84246 )
+
+-- Combat log event handlers for Survival mechanics
+RegisterSurvivalCombatLogEvent( "SPELL_CAST_SUCCESS", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool)
+    -- Track auto shot for Thrill of the Hunt procs
+    if spellID == 75 then -- Auto Shot
+        if state.talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then -- 30% chance
+            state.applyBuff( "thrill_of_the_hunt", 8 )
+        end
+    end
+end )
+
+RegisterSurvivalCombatLogEvent( "SPELL_DAMAGE", function(timestamp, subevent, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand)
+    -- Alternative tracking for auto shot hits (in case SPELL_CAST_SUCCESS doesn't capture all auto shots)
+    if spellID == 75 then -- Auto Shot
+        if state.talent.thrill_of_the_hunt.enabled and math.random() <= 0.3 then -- 30% chance
+            state.applyBuff( "thrill_of_the_hunt", 8 )
+        end
+    end
+end )
 
     -- State Expressions
     spec:RegisterStateExpr( "focus_time_to_max", function()
