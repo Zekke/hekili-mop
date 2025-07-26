@@ -627,16 +627,6 @@ function Hekili:OnEnable()
         ns.UI:StartUpdates()
     end
 
-    -- MoP Classic: Force spec detection on enable with delay to ensure LibClassicSpecs is loaded
-    C_Timer.After(2, function()
-        -- Check if LibClassicSpecs is available now
-        if LibClassicSpecs then
-            print("DEBUG: LibClassicSpecs loaded, attempting spec detection...")
-        else
-            print("DEBUG: LibClassicSpecs still not loaded, using fallback detection...")
-        end
-        self:ForceSpecDetection()
-    end)
 
     self:Print("Hekili Enabled!")
 end

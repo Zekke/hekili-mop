@@ -21,83 +21,58 @@ local spec = Hekili:NewSpecialization( 253, true )
     -- Use MoP power type numbers instead of Enum
     -- Focus = 2 in MoP Classic
     spec:RegisterResource( 2, {
-                -- Steady Shot focus generation (MoP standard: generates 14 focus)
         steady_shot = {
             resource = "focus",
+            cast = function(x) return x > 0 and x or nil end,
+            aura = function(x) return x > 0 and "casting" or nil end,
+
             last = function()
-                local app = (state.last_cast_time and state.last_cast_time.steady_shot) or 0
-                local t = state.query_time
-                return app + floor( ( t - app ) / 2.0 ) * 2.0
+                return state.buff.casting.applied
             end,
-            interval = function() return 2.0 / state.haste end, -- Standard 2.0s cast time in MoP
-            value = 14, -- Steady Shot generates 14 focus in MoP
+
+            interval = function() return state.buff.casting.duration end,
+            value = 9,
         },
 
-        -- Cobra Shot focus generation (MoP standard: generates 14 focus)
         cobra_shot = {
             resource = "focus",
+            cast = function(x) return x > 0 and x or nil end,
+            aura = function(x) return x > 0 and "casting" or nil end,
+
             last = function()
-                local app = (state.last_cast_time and state.last_cast_time.cobra_shot) or 0
-                local t = state.query_time
-                return app + floor( ( t - app ) / 2.0 ) * 2.0
+                return state.buff.casting.applied
             end,
-            interval = function() return 2.0 / state.haste end, -- Cast time
-            value = 14, -- Cobra Shot generates 14 focus in MoP
+
+            interval = function() return state.buff.casting.duration end,
+            value = 14,
         },
-        
-        -- Dire Beast focus generation (BM signature talent)
+
         dire_beast = {
             resource = "focus",
             aura = "dire_beast",
+
             last = function()
                 local app = state.buff.dire_beast.applied
                 local t = state.query_time
+
                 return app + floor( ( t - app ) / 2 ) * 2
             end,
+
             interval = 2,
-            value = 5, -- Dire Beast generates 5 focus every 2 seconds (BM gets more than other specs)
+            value = 5,
         },
-        
-        -- Fervor talent focus restoration
+
         fervor = {
             resource = "focus",
             aura = "fervor",
+
             last = function()
-                local app = state.buff.fervor.applied
-                local t = state.query_time
-                return app + floor( ( t - app ) / 1 ) * 1
+                return state.buff.fervor.applied
             end,
-            interval = 1,
-            value = function() return state.buff.fervor.up and 50 or 0 end, -- Instant 50 focus
+
+            interval = 0.1,
+            value = 50,
         },
-    }, {
-        -- Enhanced base focus regeneration for MoP
-        base_regen = 6, -- Base 6 focus per second in MoP
-        haste_scaling = true,
-        
-        regenerates = function()
-            local base = 6 * state.haste
-            local bonus = 0
-            
-            -- Aspect bonuses
-            if state.buff.aspect_of_the_iron_hawk.up then
-                bonus = bonus + 0.3 -- 30% increased focus regen
-            elseif state.buff.aspect_of_the_hawk.up then
-                bonus = bonus + 0.15 -- 15% increased focus regen
-            end
-            
-            -- Rapid Fire bonus
-            if state.buff.rapid_fire.up then
-                bonus = bonus + 0.5 -- 50% increased focus regen during Rapid Fire
-            end
-            
-            -- Bestial Wrath focus efficiency (BM specific)
-            if state.buff.bestial_wrath.up then
-                bonus = bonus + 0.25 -- 25% increased focus regen during Bestial Wrath
-            end
-            
-            return base * (1 + bonus)
-        end,
     } )
 
     -- Talents
@@ -590,11 +565,11 @@ spec:RegisterGlyphs( {
 
     -- State Expressions for MoP Beast Mastery Hunter
     spec:RegisterStateExpr( "current_focus", function()
-    return focus.current or 0
+    return state.focus.current or 0
 end )
 
     spec:RegisterStateExpr( "focus_deficit", function()
-    return (focus.max or 100) - (focus.current or 0)
+    return (state.focus.max or 100) - (state.focus.current or 0)
 end )
 
 spec:RegisterStateExpr( "should_focus_fire", function()
@@ -649,18 +624,13 @@ end )
     -- Determines if we should use Cobra Shot over Steady Shot
     spec:RegisterStateExpr( "should_cobra_shot", function()
         -- Cobra Shot is preferred for Beast Mastery when:
-        -- 1. We have Serpent Sting and need to maintain it
-        -- 2. We're in combat and need faster focus generation
-        -- 3. We have enough focus room to cast without capping
+        -- 1. We need focus and aren't at cap
+        -- 2. We need to maintain Serpent Sting
+        -- 3. General focus generation
         
-        if focus.current > 86 then return false end -- Don't cast if we'll cap focus
+        if (state.focus.current or 0) > 86 then return false end -- Don't cast if we'll cap focus
         
-        -- Prefer Cobra Shot if Serpent Sting is up or about to expire
-        if debuff.serpent_sting.up and debuff.serpent_sting.remains < 6 then
-            return true
-        end
-        
-        -- Use Cobra Shot for general focus generation in BM
+        -- Always prioritize Cobra Shot for Beast Mastery (pulled from Survival logic)
         return true
     end )
     
@@ -694,7 +664,7 @@ end )
         -- 3. When cooldowns aren't ready
         
         if buff.bestial_wrath.up then return false end
-        if focus.current < 30 then return false end
+        if (state.focus.current or 0) < 30 then return false end
         if cooldown.kill_command.ready and pet.alive then return false end
         
         return true
@@ -752,7 +722,7 @@ end )
             startsCombat = false,
 
             handler = function ()
-                spec:apply_aspect( "aspect_of_the_cheetah" )
+                apply_aspect( "aspect_of_the_cheetah" )
             end,
         },
 
@@ -1463,16 +1433,7 @@ end )
             end,
         },
 
-        -- === AUTO SHOT (PASSIVE) ===
-        auto_shot = {
-            id = 75,
-            cast = 0,
-            cooldown = function() return ranged_speed or 2.8 end,
-            gcd = "off",
-            school = "physical",
-            
-            startsCombat = true,
-        },
+
 
         thrill_of_the_hunt_active = {
             id = 34720, -- Corrected ID to match talent
@@ -1612,4 +1573,4 @@ end )
         width = 1.5
     } )
 
-    spec:RegisterPack( "Beast Mastery", 20250722, [[Hekili:vZvBVTnos4FlfloFPBt9jBhNKUxCa2UVGT5UTOaUlUpCyTmJeDSUilzijhxxeOF73mKuIVisjz3CF4WIDrSe5ZmC4WHpZqQDXOfFEX8qsbDXhh7nEQ3vJhpC01Ex6D5I5fh2sxmFlj4rYdWFKq2a)3cAEbjhF8H4usi2980DzbWRwm)(DrXfFizX9nX8QjtrmZ3sdGhpDYI5RJcdP82sZdwm)ZRJYlxI)lPCPqQLltxb)oOiknPCzCuEb86vPzLl)n6JrXrdxmN9qunwffhtZG)6JSbfnHCFmnCX7xmpilQGMfrqjD)UvRgMtZ2stk8ZlIsEy4UTlMZfb0007Zi(5Rtl4Qvw0w(l(NP7F7Q0GDO8zcc0XSOua5ik8SZiHKTf0q4TzPBGHrciXvKaADZoW1)xVOag)ovqHiUzw5Yl8kxoOC5Rkx2PwNxqjHh4Qn(pWerwEr7MIT0IHK4ONOmPiK7TGCN6jb(Ey2oIe7VpJuS2WI8EugWWBnjhNNGNUj6Re27ADiwqIHrXqI)MDzH0m)0v(bzP7ZhkAntFydynPRnGB0zuKt6sKXhs(IF2U81AIs3q0HGRHaf4f9042bMGJCSFq6MnKKqe2PoHLb0QmAYxpmewgg8iFgBsFKcBg2FvugfLXLTldtym9rUqXhHKfqsOvoFF8Qta5oDWvwwY8VdstJdt3NK3UpUdj(8ZLllizpatsGtl1Vi1pmIYx1DPQ3FCAAO)QDzhmC9)XDfPVnGGU)PfRXyb1k0lxOGVrLp)qczBomVacn5HowG8kH7tgzBuiZjPAQ5mhowTRiJMwU81sDrcB7lB6vOHttJU0ttJSgaX9cVJiaYPPEggmTWmUxRkuRqWW6Fpf8hnnu8f9H0vrbrfvlD5AIdLurjKW2(6AHwSIM9uAMMgOSB2KRucfXAjFLm9l0GDavHJyVkHnCnLexS2FBqbxcJ9CesvFT7VWfy9gxNXHdmi0409im)LYLCS7ybQt94iIw22EwTHUJiMMsEIN7yOGr1hSpalRnae9J3eyHOH1oZINMLMwWEQuwBaNgAwUFajo2W()j0wVRaiVHXbH5NYLkArFyoabubQgHmQgAUBctggygmhQpsB92TahhPQQIwNbj1DebhS7jfkwyy06JM1rClmSUJMKdTUDJBucaeOW(HKnGDWFAoth5Z8d3q(s5YVVCP3WluwAsH(c8aqA3Aw3FUsKQ0tB3QAk(joe)LQlGJEibcRGKcB1KPBVWFvSod6g4lJqETyok5rq(kEpr5ySNaXusrf5LJ1BTp0j0nF)kFPJuq6eBF52C)fINpjTdFlSNpr9Pj0nS8uybfuS07IlISzi(X0FrDerc)p7YlqdshotTfxYMUm26ByMfhrU6MM)9KSmy6tl0Gnzp1mAPg3poi9IVYdXee8I088of6ytHosjwKcqTZhXgYxy4gr)Y240CgEa)ln)i9xXDLGafz(3NMSlN2bR6CichRHdX(m6c)l2giZar(ml7hn1XoH6oFFocPuNJBuW2FyBwAWXKHPHco1FCdfK9SkfSokLdceT601qynTgtvTgDUi3CFA(wy(57JkcwBBMPQJR3LW20Ddj7raMdbXW8lRZ5yNmSXcwpCyzBxYS1qNipzMpFZf4QYAiM4tB72cSqAD(YDOV2qDKxFIDOHOfRsRZTwJEkNCzCJ95wmMrWAGvozly7moBbltG8cTXtuZhs6mppDtUX81VXm4)q5Y3tz5D(7mgwqO5)ylwQnyM7UDXWphp(CKK4yi4w5Y50cCyNZCX9XD0HFndSBVTCjJhM4rGng2wg02yaNZ8E7ippafODHr5OwM)AWo)ukKd3979tFIMft2oBfjg5pdq9J4RqnJLmr5Y)fMnb4cXBiUDA2J(KKdkDHpC(R54aj7r037q1en4dUMg8iJivgj5bQs3(j8nSrt5s27evd8FalxH3YxVYgn46xi3oi7CF0x1VAVSzfz74y9jb)OVc)8ZSoWR2i0fU(b0uZjCrWYIA3MT(12PzxZnJcgd4l1TItbZ4yVxJYH(w(CplMg6uZJQHdcfknYaJ7aV8QD7mx1i8vOqcSald)SOaQFsAAymTNP4tWsWwuzBIYst8xt2)OE510Ad(6ETpOlOR6Jd8RBy7759kRbQ14CZtv2E8qjMTMmBVOHPftbG7Ad44LkpmJqtIc8jpWs2r2)TPMmBXsJ0B6TwkUyZAcoTInG7QUvvZkJ3Mr3qIsYnZtsP(Hw5m)RWBuPm(sXu2YCUEvPB1RVJIIAPizU9Y7alLQf2QFCFgqhz5zBDaDKfK1XacCv3ab07278vv5fR5aQVIhcWtliRBjMJOfgUA)UqderqfvrOD)hb7byNmipt077wr520ilhKMaEXmkXyKxdczAVRRCqmehYh5AjyWlOjp0zMfv2A76DNrOAwVCi(swAbNoxRZF9T6Aw4T)tPyiGkX8)MdiZALQLQMELM7rHjCt5V7T7CvMAfN6tQmZNqLu7UiXDu7AjMA1EUZQ(UnDpShlUKPXGV(v22ISbqnlIT6Ig1kr)Ux2nVh55epRGvV)i7yfCSM7JJABfMRQgibZOsaJo6JjYOoWkBKBub6rUxKOaWvVZnaUxOCAfJ4JJMQsJtTyDsPuvGvcKOLTaAoOGPVDcmpk3Tsggk)aKB1MEyK77zXvt4R9aB6e7YfjVnez3ciJmDlxIBcSWg7xJt5ydfuRKGdnZZOFXfRJoOTrawbNwjwkvnqwHOQzluQM6Z)Hpg738OcYIaU7Wq4N)0C5(k8R8HpFcwEqWwcS6wmkiyNaULiQ9cn9nATeaTxO0OC3wcG2pG43jglbn1m0ZJk2X0ym7DowIBBtpLdwhABHsD35oP6mvta1CpTfATpsPVhYYenXkpbhBbH7LPX4y2SfXTp6p(4g1swtq61j0wG5EPVA1bUoyCVqPZmlued)gkjONUNKLWsxrCjW2MLcEUu(TbBteW9gRrv(UTBtZkeL8bIUbYkacadz68iTiFiwXRpuW7eRCByiikRCqy8D6tS6LjdZdUeX7crJjncVfh)q5DSs68V)dSAtFa2ci)ppVC5(1rbRvBnVwvcPwUmjfbh2edpJ9yjUH4FjkNuLq)7LlbDxiMpZHacO)NIeAKpASIK3Zknv9isazrvtzwd2Js2T5EAgk48yGqw5DFydAWWhGjoOTWgE7cSstRb6JZZ3SBvw0Jyzkzg(fZ)UQs01SIJ39DTw0X7ynOUYJ4p(Ml(icYPx)rS3hzjiXU8TwfseJx2crIi(nvls(Ctpliz5DChgGasvXRFZS)2Qys(JNJvHCMrbRD0(00qrZTvZs7DQz9hppA1Sx1r9l7dw1ThbSFLT0oSsMxmvtYBYARvlfP9wOLJbdsxhjI1UZzyEogBDMbPxXSE7KDRrTDSqfZAS9NFUjp4BMDPNq4UPJQkyx20b2OcpBKAxRyBIDu2pD(R3m1BWRSZKVAHHn(Mn0qL984gj5L)RZMALTz3DtJwz3n3K)yp6b)onlcE7Koy3abmbX5aD6k3oBs39SIIh29gCcVD20UrOMTgcrtcF3kj799arVUXtN6w3TxJbMnRW4EGHc9RUBnJfLZfLIPZxOBRQmWtD3b9swK4ti2GnanQG9leQY6ck3jrReIdo7iKYOPoSgnQ3N62mUkx4rj6l9Ci66Y2PiYg18BGm24XiuNJxzH5uKAZk5n4mTlI6TZUW75NTkFhYHxNtfzOxI0bm4Vz2KReU8FZNjLunSgXMrSP656750484Gqxo22zq7Na3Tt7wl06OMI0DF77kTUrQhbb6bi))ZqH5J9YCAhQ(7k7XdAs9PSWD7novMBMn2ZDF7mCxhIvCmioMfm7Yjf1ZnChXIDxqCKbdDdu9zyOauJJ8WD37z8r3aCcPfycHS(5y)B7inGDxCdJYjsOmwSD1hD7Nip4aNlU4ZUaHXP9ghrpU6DU7H(zmOAhBCWe9XqIvWHtTY51KvcdWig6S8cHzJy4eZM3JjnWwzcZyJNCZSlmbwCVwvMcnUUSnaDA1uIk3koy92NWIMkaD0utqBoxz25lg0YShpzxRxuaPKQYV4nM1hqCVdyEi8CLhyRSdYlWGvmnUXakbWL5ZmAA9OO5LpWkQ1xDal4DZSRDOjQ(rwsRcudNruyMsRFrbszvNZfQG1FvcOW6kbSlSdIY3wGnuMyGYL2rr9tiqNFg(x8pcHB8gE9aXhFqvfaA7Jtrkj9edNP(1UOUCT6RL55Nn)szCbfO5QFpkklQS9rVmq)dEzqtQ7QuiBijNLBruKinQ0VeFseMSV01M(eXRveu(6iQ3waIa6nW9EMSr4XCvOLkGwY(VrVeFNRDnJNnsze14ItBBwBINB5OZiWIGCnATjOrETTJHPO7ypSbIn0nUu0vw5oVu)kcwPiin3V323Fax2AF7bv7Wm1ZjWMCDT9HdOGC1hnGnIJgiR7nB7BeqdxHg3UFQ7p4EPAWki0BAlzkBMLQEDse5h0rMwvGFKCY7lSoZxPVaONiVL03N0xKog(TxyX8R70yV7T7I8I9)Lkuc0YW5ecqx1VtnS8X8H6kfR47jUvhJosMwcHXeQ1(zBcvIGUrZoaUIxxLjKh7qYx8F)]] )
+    spec:RegisterPack( "Beast Mastery", 20250727, [[Hekili:DZ1)pUTTv8)wcg2TlnjE2(SVlP48bK02H1S1Uc4omSFXs0s0N1ozrp9LCXfb(V99EKusKuKusxsbAhoKl2sKV3Jp(4N3xi5Tz2MFEZ6ysjDZpoF68LtVz(ntMoB6vxDZM1LNos3S(ij6bY9WhYihGF)okPO8C4pa)MMFcF9PugjgjtbRkpcAYM1BRssl)(SnB7s7PlVAkq7IJ0i4XlVAZ69jXXurBPfrBw)Z7tkohI)JCouY9ZHSDW3JktyzNdttkkHxVJLFo8VsFijnzcii5SDjPa7)dWdRYaP7RphQlTNFp8U)5ruKIph((Q0tNdNFZlHFbI35WZVh)bAYpLtFve7Wwc01cAz1rG1zqposHhCGKbc0bAw553leOIjhZPI2)Iv)zco0kdy7ck3tdI2tPLK9Vmz3QNTTA3UjwF9KQJx8SdmuQJV4a7djz3peIVN84dUOm(oozljPGSA82KCwMOj0mY2uqDma210PE5PL31YrXy19ymIKMgaQ6GzC(GFIKM8bQ9wVNpvxeCGKZLRlHjSsG2ftWNeqYo9PpvsYVNwojPiylRO45xG05d0Gyw5e1UVA6fYwwMCGguYcItO3nBP0Q4hijGTxTDXX8ewEsjybvCcmUo0iDGmDKHF6L4cMvX5eAwsua5EWmT8ekICTZwArzcjn4XCsjF(x80ugloTQOeEsJCRin3U66PNdV4CO(qskHF3bk80SOtUnvTQFNW1Vx0O5Wxc8dB4QzQDfivm2vSJT9d)0EkjTCFWXOYBxovAayoeBwDLaABqg)2FA95WCwjHVQ2ucfFnaxRl0KrmwAm7XSI(B6owuvrWUKCAGhDGfoaDy4cKGlJHbaavknxQhwNuwX5ej1eARxcryuCoqAitZOhsOf3Dv)Dew4XLvS31FEsm8Aswe9Uvl7NcX0D0ScGTijsYG1dGntqm5aOfcwwCNWsaw99XVA6KbirOX2y0Hcl)GIhtkJ2BrjSA(aOrcnhw4KvvqhGYEBvErPZfUYzZ3wvYEve3BddW7YrKIA71WljXKJCNo7YzhaNBiOZosevfhbz4ZBb5A6oixCyHGDv5UXpCIwyLGfNYihlObfa7Hv8FHOAo5ysmFzxRhI2NHGCxocUmBPdTbj4qvEmmdcUwIYzpYf)A3CMVR2b3Oy91tDW60tzFmiVQyVclBEwdRAHghdtDoEJrCSTyKmkCT9HTJqbGeSanjkP8UvlM(PpzL)o4ZoA(hy5k8q8Gg6Zj)TRU6gUb)pdwopqvaR0OfSYkibCl(YIuw5QsrBNnI2oxUU6VGmf(py4QUy5PSIYQxbCC38CD)ACD3UCA2VCAcaqg9aGp6W12f1JhJ3KtparnuC3Y(LcToQji933HUCUFknaKMbqKF)mu42yFddnUAC8xBbbEtoh(kLmgkzymvGBhiOpq4sPVsSowTVyom5jh5FH7LN(FRGqYOqYiV94rmJJ108JONUW1y0wGPlKztgRuedaOIcjP5us8PjGGX9N83GOgqH8am8InE669yprsulkyItBPPShX0A(JNdL(JX0BaX573zraWuT2YQkfJWDeKWSDqlVmLcbxgwUNaJSRXKHIyzXWtsP7GvwHWkxuW2MtessJW928isgvv8IQYZ5mvUGgz6bUExq9BEttN1iOcIHsWzW0lK2xAqb0gbGfhpvjk0vZN2tFJeku918UIC1fLke6YGcuvY96ft5Kq7fEjreoCBgjw7Ueg52RfyW3TA2c30JW19neu2JBEJ7E0RFBpm7P4l2n5gHlixKyKUODtOJShHmdBmW4eQ5z9pugOxB3e4(ucgxBjKFNcfuEA)KG(XJPScE7H5tvZt93WNIb0H)bGBDathPGVUTfvRQGJuaEblHvSqNZbGbKLd1Sg()Q04G2hoelziVAah0KgkpvLisaU3Y(o1qaiX)hiBA0JGBS8dvPLjdak)hW2bb(y0WVwGQkl103KsjiioIVPGQ)sjyjNgVsdRudExILdjqq)tCC2w83L1y8fw8b08ilmWoEkKcjOI5J9gnSqwBtL6kzvjWHwqeFKnbJYXKkUXt1P4TlT2ZbIIpij2S5Bj55qmbkRGKpPbkWKelRTQUUdVFc20Iooklz9UoyyGodK5neTJAVlWGzNxCHhOcXYbz5dKfhTQKxGRwovxEHx4RMOIYPzTIHT1g1knHirGbhxUmSFAlNXSLnJcJM7IQqFPz33yWOrVBx9AhsIQvHLQQaIHZOc4QYVTUMkAXE2WRMsUGcifs0jhJOezwF1FzHDISJMCFgKOOm8CtQCLbvU2ovoKuG(Z4VrFvp(PY9quSL3oDYRVaudpWl3RO(Fi4zT1IW2XAn11Ql0Qd8s4xWlkPACsqGU0yEo1YNKZyL8N4IuGKdzlMCijMul5YfvQpUzvL0ialTdmgSvH4LE4KZITkRJSqLu7sruulURwUEjs6mHH(Lt(f96sorRsyVWOu4rNGohiDySAMIktTzC0CBJPRM6Mp6X8AHrUIb2A51NA6Jy1c3S(P6UsOLtWYYvqRrSoMZICQBvQqy3yQbAiEjVDZweS4yKG3TFhhVs83LtDsytpNguEzWCnkZ)oszlXVAqzdFvM0DHbDLsSFCQ3HvcfuC7jfMwLUcUAROlpMKfJPKAgt1)MvL3PraUzogVgb(xbdjo(PtSkiBw(6H3jYp7C4)ctqdcfd9Jkylpkl(0BkHVlHG1EsQwVHMGXzvBgKuIrAbE5aSmi9AJK2fHqPZqNzMV(i5qNKFZqXYiiVh3tZKITlI1mVYvoVWxvvSzNv3l3HM1tMU1eWW03E5VKcWvlT0)NsgIdv4gzYEdLS6ve0sDaVAOuQNigLRR(7ShF1orDrKBrKwnOEsf7KtNHibD6rVbRwVDJFKgvH5dkXdUSofQULFsrWOIE510SNebAjHHXP1(vBCUWkf6r9Sz9haFLqFAoddZ3S(rsEgwCYnR)(dhz58zgiWD9nXdwbVznPQCplFZ6Idv7YtEyZA(RWdlHqBdF6h5hbdPP6M3TznGpctVjeOxDLgblGgP8mfm1nR)IzkTPegY9jAkgfTYM6dXFwZxm4FO26pd3DB5a4UvqwVtBjS2YnJX9xwxt)g0V0VfCk53MqFo0kaz7CP6IFKSx5KS2rAnmtUAzlPvafqkVWjL7Zl0qghD6mYYL9XYo(O4SAukWgsGm8A)ApvNxs91qyrRBqKh30hyqp4uCOajW7yad6aQFo82vO3fhgt64cJXjLFZBNYHPT4IPoTfDBLpcDOwsr20K1DuntpGmQjQHDsxrnMCqvfCxzvQo3PKWhOIaRVP(v1pdrJTNiIhQotmtONvOysAHI3jvkArR4DwYK2DwkzK5zlBBZCvmj2uif)lf6wGh(qTT8mNd)QZHtNOmaBRqKXmS1Qm5FIOBLHSZ(RvanARTKFDP(Q82sgbZyijFTCQMx6if9OsrNeAs9AU4xDAw1OZHF6tn2AnvosHBkvDYqB6Tmw9HK4SCtQ23Yso5ZKxXRNk18R4FMPNgrTOuaCAkAvJTkbmFTPAfhkyJd5OHMY)bNCyU6fVr50rkM5SPwW17x3CuoLNqY2bN4Wz2l(JUgY2rJ8CiWOzw1AgUGCESmh7cenFpySX838SEDKxFUnTfoKM4l(c)SVzAUB9uBksOjqyf0CMESfcKB2OqbRhLdBX3miQPTDI2IGzqurMOg09xB0Dn9J7tZPp(4XZc4yrtoimEuyVzWJHwA3zljKPwPr)6gHmz20NaxgQRk9HvRFqKVUIKX7mKHdaKoMlThI8BZ3(CngPh4fYhZfVdsEvlulNkdFjzpqLASrK1TiIrvo6VKdwQSDlaSw1T9LPUAyVgHz2Br49dnBRa5gcyDrY1ZPAJ9Sf8huULQM3HzkAdhbT6ou(MfDENuEwR3tf4Ex7wQYSGTwy6C26U42x8lA7lQy6F2YAPZ5oUQQh0EN)zHoSd9W)ALaER3ZwBU36ffuk3JEQR5sO07CN3zRALM82)W)Q42XmU5rxx5jF33PHErN6nyjlJq5v9PE4vhYR59oY1GeBtVrX2pBT0c1lIuRY3NcVPh(TVebngya2OflTNcdDPsqM13CjTyCRVQpHpxnlxZ7WepO0PEZswjNbTceWTQThb2iQwJJ6nT0BKQYSq8DeQnt3rP2u6le(SpW4(T2T4prVS0EnA7joDJd)SF7TEOv7XF2VH3qgq9uEXrnGCxgXXmGkfbe71W0waDJUyn6gx)kD6c))IJw4ax3yVgDARThEaAdT2W9VxawnwSAr4D1K9ZyO1XClSOsq0xRUDxcI4Fby3n01GIZw4igM(lOV6w(6HQ673xN0K7OCSDeMDPGM3HXk2jkeAJLuJ9p5UWiC1ohZXw(O)kb6JEXf8IdnkJuD8MFTUzk)w6AP87U7KYya66V2CdhSZ9UIOSwuB3n8I457MMWrKVE4qjUbev6(nVrjcB99fZn(wTcu7(O0sN2h7hrRVT6vrYSTHU9IPPFpvuvC4sD8VMgnbUYBPF8QHTlXT0uBVG7u8Uo0TZTyPLsnVItjFyAoUplTKQ9DCA172HyXTGtO(ofE7Z3HOoW74VjmCXY9QTplxQZCV(6ZWbwD16968Yr(A(38fRbTBej9xM7lVFS4ptH3s2l9xpc9lohohFPZSE9jiyDPEUlGUpZZ0YttIW)0J88Eak7nY4HCYxEAINHcBGNpg3xmpPKik0G8s1xFapesIdH85UWa7190tXlI3DLQ(s632X6RIpyDNIOEnF3IdjJ(m3OpZ3u28ZM)3d]] )

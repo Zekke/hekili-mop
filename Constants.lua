@@ -175,6 +175,7 @@ local MoPPowerTypes = {
     blood_runes     = 20,
     frost_runes     = 21,
     unholy_runes    = 22,
+    shadow_orbs     = 28,
 }
 
 local ResourceInfo = {
@@ -203,6 +204,7 @@ local ResourceInfo = {
     blood_runes     = (Enum and Enum.PowerType and Enum.PowerType.RuneBlood) or MoPPowerTypes.RuneBlood,
     frost_runes     = (Enum and Enum.PowerType and Enum.PowerType.RuneFrost) or MoPPowerTypes.RuneFrost,
     unholy_runes    = (Enum and Enum.PowerType and Enum.PowerType.RuneUnholy) or MoPPowerTypes.RuneUnholy,
+    shadow_orbs     = (Enum and Enum.PowerType and Enum.PowerType.ShadowOrbs) or MoPPowerTypes.ShadowOrbs,
 }
 
 local ResourceByID = {}

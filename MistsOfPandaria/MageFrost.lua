@@ -8,32 +8,20 @@ if playerClass ~= 'MAGE' then return end
 
 local addon, ns = ...
 local Hekili = _G[ "Hekili" ]
+    
+-- Early return if Hekili is not available
+if not Hekili or not Hekili.NewSpecialization then return end
+    
 local class = Hekili.Class
 local state = Hekili.State
 
-local function getReferences()
-    -- Legacy function for compatibility
-    return class, state
-end
-
-local spec = Hekili:NewSpecialization( 64 ) -- Frost spec ID for MoP
-
 local strformat = string.format
-local FindUnitBuffByID = ns.FindUnitBuffByID
-local FindUnitDebuffByID = ns.FindUnitDebuffByID
-local function UA_GetPlayerAuraBySpellID(spellID)
-    for i = 1, 40 do
-        local name, _, count, _, duration, expires, caster, _, _, id = UnitBuff("player", i)
-        if not name then break end
-        if id == spellID then return name, _, count, _, duration, expires, caster end
-    end
-    for i = 1, 40 do
-        local name, _, count, _, duration, expires, caster, _, _, id = UnitDebuff("player", i)
-        if not name then break end
-        if id == spellID then return name, _, count, _, duration, expires, caster end
-    end
-    return nil
-end
+    local FindUnitBuffByID, FindUnitDebuffByID = ns.FindUnitBuffByID, ns.FindUnitDebuffByID
+    local PTR = ns.PTR
+
+    local spec = Hekili:NewSpecialization( 64, true )
+
+
 
 -- Register resources
 spec:RegisterResource( 0 ) -- Mana = 0 in MoP
@@ -116,6 +104,175 @@ RegisterFrostCombatLogEvent("COMBAT_LOG_EVENT_UNFILTERED", function(event, ...)
         local critical = select(21, CombatLogGetCurrentEventInfo())
         if critical then
             ns.last_ice_lance_crit = now
+        end
+    end
+end)
+
+-- Enhanced Frost-specific combat log tracking 
+RegisterFrostCombatLogEvent("COMBAT_LOG_EVENT_UNFILTERED", function(event, ...)
+    local _, subEvent, _, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, spellSchool, auraType = CombatLogGetCurrentEventInfo()
+    
+    if sourceGUID ~= UnitGUID("player") then return end
+    
+    local now = GetTime()
+    
+    -- Enhanced Frost Proc Tracking
+    if subEvent == "SPELL_AURA_APPLIED" then
+        -- Brain Freeze proc tracking
+        if spellId == 44549 then -- Brain Freeze
+            brain_freeze_procs = brain_freeze_procs + 1
+            ns.last_brain_freeze = now
+            state.applyBuff( "brain_freeze" )
+            
+            -- Track Brain Freeze for Frostfire Bolt priority
+            if state.settings.brain_freeze_priority then
+                ns.brain_freeze_available = true
+            end
+        end
+        
+        -- Fingers of Frost proc tracking
+        if spellId == 44544 then -- Fingers of Frost
+            fingers_of_frost_procs = fingers_of_frost_procs + 1
+            ns.last_fingers_of_frost = now
+            state.applyBuff( "fingers_of_frost" )
+            
+            -- Track Fingers of Frost stacks for Ice Lance priority
+            local stacks = select(3, FindUnitBuffByID("player", 44544)) or 1
+            ns.fingers_of_frost_stacks = stacks
+        end
+        
+        -- Icy Veins tracking
+        if spellId == 12472 then -- Icy Veins
+            icy_veins_activations = icy_veins_activations + 1
+            ns.last_icy_veins = now
+            state.applyBuff( "icy_veins" )
+        end
+        
+        -- Rune of Power tracking
+        if spellId == 116011 then -- Rune of Power
+            ns.last_rune_of_power = now
+            state.applyBuff( "rune_of_power" )
+        end
+        
+        -- Invocation tracking
+        if spellId == 114003 then -- Invocation
+            ns.last_invocation = now
+            state.applyBuff( "invocation" )
+        end
+    end
+    
+    -- Enhanced Cast Success Tracking
+    if subEvent == "SPELL_CAST_SUCCESS" then
+        -- Frostbolt cast tracking
+        if spellId == 116 then -- Frostbolt
+            frostbolt_casts = frostbolt_casts + 1
+            ns.last_frostbolt = now
+            
+            -- Track Frostbolt for mastery and proc generation
+            ns.frostbolt_cast_time = now
+        end
+        
+        -- Ice Lance cast tracking
+        if spellId == 30455 then -- Ice Lance
+            ns.last_ice_lance = now
+            
+            -- Track if Ice Lance was enhanced by Fingers of Frost
+            if FindUnitBuffByID("player", 44544) then
+                ns.ice_lance_empowered = true
+                ns.fingers_of_frost_consumed = true
+            end
+        end
+        
+        -- Frostfire Bolt cast tracking
+        if spellId == 44614 then -- Frostfire Bolt
+            ns.last_frostfire_bolt = now
+            ns.brain_freeze_consumed = true
+        end
+        
+        -- Water Elemental summon tracking
+        if spellId == 31687 then -- Summon Water Elemental
+            water_elemental_summoned = water_elemental_summoned + 1
+            ns.last_water_elemental = now
+        end
+        
+        -- Frozen Orb cast tracking
+        if spellId == 84714 then -- Frozen Orb
+            ns.last_frozen_orb = now
+            state.applyBuff( "frozen_orb" )
+        end
+        
+        -- Deep Freeze cast tracking
+        if spellId == 44572 then -- Deep Freeze
+            ns.last_deep_freeze = now
+            state.applyDebuff( "target", "deep_freeze" )
+        end
+        
+        -- Blizzard cast tracking
+        if spellId == 10 then -- Blizzard
+            ns.last_blizzard = now
+            state.applyDebuff( "target", "blizzard" )
+        end
+        
+        -- Nether Tempest cast tracking
+        if spellId == 114923 then -- Nether Tempest
+            ns.last_nether_tempest = now
+            state.applyDebuff( "target", "nether_tempest" )
+        end
+        
+        -- Frost Bomb cast tracking
+        if spellId == 112948 then -- Frost Bomb
+            ns.last_frost_bomb = now
+            state.applyDebuff( "target", "frost_bomb" )
+        end
+    end
+    
+    -- Enhanced Damage Tracking for Shatter mechanics
+    if subEvent == "SPELL_DAMAGE" then
+        -- Ice Lance damage tracking
+        if spellId == 30455 then -- Ice Lance
+            local critical = select(21, CombatLogGetCurrentEventInfo())
+            if critical then
+                ns.last_ice_lance_crit = now
+                ns.ice_lance_crits = (ns.ice_lance_crits or 0) + 1
+            end
+        end
+        
+        -- Frostbolt damage tracking
+        if spellId == 116 then -- Frostbolt
+            local critical = select(21, CombatLogGetCurrentEventInfo())
+            if critical then
+                ns.last_frostbolt_crit = now
+                ns.frostbolt_crits = (ns.frostbolt_crits or 0) + 1
+            end
+        end
+        
+        -- Frostfire Bolt damage tracking
+        if spellId == 44614 then -- Frostfire Bolt
+            local critical = select(21, CombatLogGetCurrentEventInfo())
+            if critical then
+                ns.last_frostfire_bolt_crit = now
+                ns.frostfire_bolt_crits = (ns.frostfire_bolt_crits or 0) + 1
+            end
+        end
+    end
+    
+    -- Enhanced Aura Removal Tracking
+    if subEvent == "SPELL_AURA_REMOVED" then
+        -- Brain Freeze removal tracking
+        if spellId == 44549 then -- Brain Freeze
+            ns.brain_freeze_available = false
+            ns.brain_freeze_consumed = false
+        end
+        
+        -- Fingers of Frost removal tracking
+        if spellId == 44544 then -- Fingers of Frost
+            ns.fingers_of_frost_stacks = 0
+            ns.fingers_of_frost_consumed = false
+        end
+        
+        -- Icy Veins removal tracking
+        if spellId == 12472 then -- Icy Veins
+            ns.icy_veins_active = false
         end
     end
 end)
@@ -249,22 +406,7 @@ spec:RegisterGear( "tier16_4pc", nil, {
     generate = check_tier_bonus("tier16", 4)
 } )
 
--- Spell Power Calculations and State Expressions
-spec:RegisterStateExpr( "spell_power", function()
-    return GetSpellBonusDamage(5) -- Frost school
-end )
 
-spec:RegisterStateExpr( "brain_freeze_bonus", function()
-    return buff.brain_freeze.up and 0.2 or 0 -- 20% damage bonus
-end )
-
-spec:RegisterStateExpr( "fingers_of_frost_bonus", function()
-    return buff.fingers_of_frost.up and 0.15 or 0 -- 15% damage bonus
-end )
-
-spec:RegisterStateExpr( "icy_veins_bonus", function()
-    return buff.icy_veins.up and 0.2 or 0 -- 20% damage bonus
-end )
 
 -- Talents (MoP 6-tier system)
 spec:RegisterTalents( {
@@ -390,7 +532,8 @@ spec:RegisterAuras( {
         max_stack = 1
     },
     
-    frost_nova = {        id = 122,
+    frost_nova = {
+        id = 122,
         duration = 8,
         max_stack = 1
     },
@@ -433,7 +576,8 @@ spec:RegisterAuras( {
     incanter_s_ward = {
         id = 1463,
         duration = 15,
-        max_stack = 1    },
+        max_stack = 1
+    },
     
     slow = {
         id = 31589,
@@ -564,6 +708,52 @@ spec:RegisterAuras( {
         max_stack = 1,
         generate = function( t )
             local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitDebuffByID( "target", 112948 )
+            
+            if name then
+                t.name = name
+                t.count = count > 0 and count or 1
+                t.expires = expirationTime
+                t.applied = expirationTime - duration
+                t.caster = caster
+                return
+            end
+            
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end
+    },
+    
+    nether_tempest = {
+        id = 114923,
+        duration = 12,
+        max_stack = 1,
+        generate = function( t )
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitDebuffByID( "target", 114923 )
+            
+            if name then
+                t.name = name
+                t.count = count > 0 and count or 1
+                t.expires = expirationTime
+                t.applied = expirationTime - duration
+                t.caster = caster
+                return
+            end
+            
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+        end
+    },
+    
+    blizzard = {
+        id = 10,
+        duration = 8,
+        max_stack = 1,
+        generate = function( t )
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitDebuffByID( "target", 10 )
             
             if name then
                 t.name = name
@@ -989,6 +1179,23 @@ spec:RegisterAuras( {
         end
     },
 } )
+
+-- Spell Power Calculations and State Expressions
+spec:RegisterStateExpr( "spell_power", function()
+    return GetSpellBonusDamage(5) -- Frost school
+end )
+
+spec:RegisterStateExpr( "brain_freeze_bonus", function()
+    return buff.brain_freeze.up and 0.2 or 0 -- 20% damage bonus
+end )
+
+spec:RegisterStateExpr( "fingers_of_frost_bonus", function()
+    return buff.fingers_of_frost.up and 0.15 or 0 -- 15% damage bonus
+end )
+
+spec:RegisterStateExpr( "icy_veins_bonus", function()
+    return buff.icy_veins.up and 0.2 or 0 -- 20% damage bonus
+end )
 
 -- Abilities
 spec:RegisterAbilities( {
@@ -1609,33 +1816,48 @@ spec:RegisterAbilities( {
             applyBuff( "molten_armor" )
         end,
     },
+    
+    blizzard = {
+        id = 10,
+        cast = 8,
+        channeled = true,
+        cooldown = 0,
+        gcd = "spell",
+        
+        spend = 0.08,
+        spendType = "mana",
+        
+        startsCombat = true,
+        texture = 135846,
+        
+        handler = function()
+            applyDebuff( "target", "blizzard" )
+        end,
+    },
+    
+    nether_tempest = {
+        id = 114923,
+        cast = 0,
+        cooldown = 0,
+        gcd = "spell",
+        
+        spend = 0.04,
+        spendType = "mana",
+        
+        startsCombat = true,
+        texture = 610472,
+        
+        talent = "nether_tempest",
+        
+        handler = function()
+            applyDebuff( "target", "nether_tempest" )
+        end,
+    },
 } )
 
 -- Water Elemental Abilities
 spec:RegisterPet( "water_elemental", 78116, "summon_water_elemental", 600 )
-spec:RegisterPetAbilities( {
-    freeze = {
-        id = 33395,
-        cast = 0,
-        cooldown = 25,
-        gcd = "spell",
-        
-        handler = function()
-            applyDebuff( "target", "freeze" )
-        end,
-    },
-    
-    waterbolt = {
-        id = 31707,
-        cast = 2.5,
-        cooldown = 0,
-        gcd = "spell",
-        
-        handler = function()
-            -- Pet spell
-        end,
-    },
-} )
+
 
 -- State Functions and Expressions
 spec:RegisterStateExpr( "brain_freeze_active", function()
@@ -1670,9 +1892,237 @@ spec:RegisterOptions( {
     package = "Frost",
 } )
 
+-- SIMC-derived settings from MageFrost.simc
+spec:RegisterSetting( "time_warp_health_threshold", 25, {
+    name = "Time Warp Health Threshold",
+    desc = "Target health percentage below which Time Warp should be used (default: 25%)",
+    type = "range",
+    min = 10,
+    max = 50,
+    step = 5,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "time_warp_time_threshold", 5, {
+    name = "Time Warp Time Threshold",
+    desc = "Time in seconds after which Time Warp should be used regardless of target health (default: 5s)",
+    type = "range",
+    min = 3,
+    max = 15,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "trinket_icy_veins_threshold", 20, {
+    name = "Trinket Icy Veins Threshold",
+    desc = "Seconds remaining on Icy Veins cooldown above which trinkets should be used (default: 20s)",
+    type = "range",
+    min = 10,
+    max = 30,
+    step = 5,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "aoe_enemy_threshold", 3, {
+    name = "AoE Enemy Threshold",
+    desc = "Number of enemies at which AoE abilities like Blizzard should be used (default: 3)",
+    type = "range",
+    min = 2,
+    max = 6,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "use_racial_abilities", true, {
+    name = "Use Racial Abilities",
+    desc = "If checked, racial abilities like Berserking and Blood Fury will be recommended during Icy Veins or Brain Freeze",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "use_trinkets", true, {
+    name = "Use Trinkets",
+    desc = "If checked, trinkets will be recommended during Icy Veins or when Icy Veins cooldown is above threshold",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "alter_time_brain_freeze", true, {
+    name = "Alter Time with Brain Freeze",
+    desc = "If checked, Alter Time will be recommended when Brain Freeze is available",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "alter_time_fingers_of_frost", true, {
+    name = "Alter Time with Fingers of Frost",
+    desc = "If checked, Alter Time will be recommended when Fingers of Frost has more than 1 stack",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "water_elemental_freeze", true, {
+    name = "Water Elemental Freeze",
+    desc = "If checked, Water Elemental's Freeze will be recommended when Fingers of Frost stacks are low",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "ice_lance_moving", true, {
+    name = "Ice Lance While Moving",
+    desc = "If checked, Ice Lance will be recommended while moving as a fallback option",
+    type = "toggle",
+    width = "full"
+} )
+
+-- Enhanced Frost-specific settings (based on Hunter Survival patterns)
+spec:RegisterSetting( "mana_dump_threshold", 80, {
+    name = "Mana Dump Threshold",
+    desc = strformat( "Mana level at which to prioritize spending abilities like %s and %s to avoid mana capping.",
+        Hekili:GetSpellLinkWithTexture( spec.abilities.frostbolt.id ),
+        Hekili:GetSpellLinkWithTexture( spec.abilities.ice_lance.id ) ),
+    type = "range",
+    min = 50,
+    max = 120,
+    step = 5,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "frostbolt_mana_threshold", 4, {
+    name = "Frostbolt Mana Threshold",
+    desc = "Minimum mana percentage required to cast Frostbolt (default: 4%)",
+    type = "range",
+    min = 1,
+    max = 10,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "ice_lance_mana_threshold", 2, {
+    name = "Ice Lance Mana Threshold",
+    desc = "Minimum mana percentage required to cast Ice Lance (default: 2%)",
+    type = "range",
+    min = 1,
+    max = 5,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "frostfire_bolt_mana_threshold", 4, {
+    name = "Frostfire Bolt Mana Threshold",
+    desc = "Minimum mana percentage required to cast Frostfire Bolt (default: 4%)",
+    type = "range",
+    min = 1,
+    max = 10,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "blizzard_mana_threshold", 8, {
+    name = "Blizzard Mana Threshold",
+    desc = "Minimum mana percentage required to cast Blizzard (default: 8%)",
+    type = "range",
+    min = 5,
+    max = 15,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "fingers_of_frost_stacks", 2, {
+    name = "Fingers of Frost Stacks",
+    desc = "Number of Fingers of Frost stacks at which to prioritize Ice Lance (default: 2)",
+    type = "range",
+    min = 1,
+    max = 3,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "brain_freeze_priority", true, {
+    name = "Brain Freeze Priority",
+    desc = "If checked, Frostfire Bolt will be prioritized when Brain Freeze is active",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "frozen_orb_priority", true, {
+    name = "Frozen Orb Priority",
+    desc = "If checked, Frozen Orb will be used on cooldown for AoE damage",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "deep_freeze_priority", false, {
+    name = "Deep Freeze Priority",
+    desc = "If checked, Deep Freeze will be used for control and damage",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "water_elemental_priority", true, {
+    name = "Water Elemental Priority",
+    desc = "If checked, Water Elemental will be summoned when available",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "rune_of_power_priority", true, {
+    name = "Rune of Power Priority",
+    desc = "If checked, Rune of Power will be used for damage amplification",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "evocation_mana_threshold", 45, {
+    name = "Evocation Mana Threshold",
+    desc = "Mana percentage below which Evocation should be used (default: 45%)",
+    type = "range",
+    min = 20,
+    max = 80,
+    step = 5,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "icy_veins_bloodlust_threshold", 180, {
+    name = "Icy Veins Bloodlust Threshold",
+    desc = "Seconds remaining on Bloodlust/Sated above which Icy Veins should be used (default: 180s)",
+    type = "range",
+    min = 60,
+    max = 300,
+    step = 30,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "alter_time_complex_conditions", true, {
+    name = "Alter Time Complex Conditions",
+    desc = "If checked, Alter Time will use complex conditions including Bloodlust/Sated timing",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "nether_tempest_targets", 5, {
+    name = "Nether Tempest Targets",
+    desc = "Number of targets at which Nether Tempest should be maintained (default: 5)",
+    type = "range",
+    min = 1,
+    max = 10,
+    step = 1,
+    width = 1.5
+} )
+
+spec:RegisterSetting( "frost_bomb_priority", true, {
+    name = "Frost Bomb Priority",
+    desc = "If checked, Frost Bomb will be used when not ticking on target",
+    type = "toggle",
+    width = "full"
+} )
+
+spec:RegisterSetting( "cone_of_cold_moving", true, {
+    name = "Cone of Cold While Moving",
+    desc = "If checked, Cone of Cold will be used while moving in AoE situations",
+    type = "toggle",
+    width = "full"
+} )
+
 -- Register default pack for MoP Frost Mage
-spec:RegisterPack( "Frost", 20250517, [[Hekili:TzvBVTTn04FldjH0cbvgL62TG4I3KRlvnTlSynuRiknIWGQ1W2jzlkitIhLmzImzkKSqu6Mi02Y0YbpYoWoz9ogRWEJOJTFYl(S3rmZXRwKSWNrx53Ntta5(S3)8dyNF3BhER85x(jym5nymTYnv0drHbpz5IW1vZgbo1P)MM]] )
-
--- Register pack selector for Frost
-
--- Register pack selector for Frost
+spec:RegisterPack( "Frost", 20250727, [[Hekili:1Ev4UTTnq4NLGc40I1PAlhN0oKeGTUnSASvmm39xjrltLqejsnkQKMGa9SV7OKOOOfTxl6cqmSj)4DhpE33Dx0IOpfTzhrrJ(y48WvZVi8IG5lG)UiAJ6XsA0Mss6DKBGVWjfWNSu6dkALc34XCbzhkGkrTmf2mAZ2AwU6d8OTti15VB5BbSL00OpE(zrBULTBhTfkTknAZNULv1KG)tAs6uBtIid(DQIj4nj5SkfSDMq2K8B07y5SGOn6f1xdAgPoxbF9J6Rv7PI2KkQ5kQeuCEE0gkNSnNUl6NIuG1H4gwztQKbize4YtK3qvb3sj5QBdktvnjx2KeUQj55NBsuScW0UUjz1GAW1IFGilrbV02akysPqgZk0(XrgWz24yPpgFpLXRCaTYguMu8eLhlKBDqD(bUl5uUkOusRO8uASilUGX3f0d2iBxeOyVWRy3wNLfyS5G6YwFJE5TscJhNjP0NObskOGbTSfElOY7y8Bq5)2V9Ypxi2fNvlFeL)7CKV55sY43rvl(pOXuHiFN4bU1wsAbyav6yGW5quDUqzjtqVlMFyfh()GId1kEXXceGqOkv8wrX2(qGMKznjNGX1P63f7OToOArFO8fTOL1CD0tP4bQ0J01)uFJhJgVPdAE0EALV8ykNXVxKsWJpsZTo3H9gRNHn0k5SJRKucsNexHj77CVJDkBmM6sB9nApTsxD4CaGccWJ8lABxRQx6nrWkljd82qYg6g1pKbvkGwvh7SOj5vdg1Gg02JFQeh(WLZ1gtNRjfIwJR4KY9zwmBPLVFofJheiH2sKsgexGzddkXEN9uJ1MAfDeYLdXIODyzmjiqbuubLMlvIJ02ZB7ir04Yja9QUYJl9WXew3thwes7omCdgZVJyaqCt6UGcYNTi2PQoCAD7NHapW90ykNwWOilZvWJCFSDH4(rKdBZzp9uxmCOFQb)Y0vGPI2CEmArl0Lov(Qu6hdNI4(ZzDvG9tGsxVlfO2id9myjfSPejRS9G)bu6(hAs(v0eSsBKqUmeGiz55mZl7E2CmrwiKow9OR2dem)JMtlGqCIBxkhLtAswx)uP67oq(WbFtf23f0ldROuivD9wDAxRuN2KiP)tnKea8BvcSNhsTsuawlSq6TeigTkOz9VZ4Wwlbh0FZRQlrjHaiDTTDQDdqNAWFMx8MYDdGx5f8qdrdOxS4qW7QOzb3VPpuEWc(5EHB45Sq)2dBlgogRJ8Ud4A6IGhqho3l6H8Eh4VxWVN2cwdYjamWd7ceqOe6RPVTF5Ip)Qbv5)zON7WYU8)iyY8TqFOOhlxKo4otKNlEq36bPwsaoiirawVUcpidoKcH1lbCIcSoKQhhxOZmQ5JqVBhcggZHSLubSdRBs(E4yw1u6wYLlVBztuo871tKeAyN(wLg68iJUNM1FOOhxOZGwW2ahsT6wK7AtrDMKDhYzkYy5WCmVOjXMvSz9lGv(ZEBUzDRSQcmxJV7Q3ShH50WSynNgGZnzAqJO9Enl7Qd2J662lWp3Y8zKiih75hTx3mWxRSDMx8YWvp)mc56v2hYMk0EDRGHHfhO2Sx1DknRRMVr8Sp(W4x4b3BYJNF2xFL2YWmI1xVmGKVyOowXRXryUQF0jpYZ)Kqxho)Osn8RtQTreFcAMeQ)8MZHVQ9YUprDLtSEg2FaRzN0p8J1z)IcqnsyMNrNgfnzQAzj29hpA2uJgnwoJgwzKWMCmOzN4zaOEV57fiH6FjuAfARRHzqmVwod(m7LEcR6I3MUN5Rx8QXzZDvOrTyLUUC(mFJXmop1mHbkGtMyALz(NuzVihtXFZD(WjnMABg8tp1Xi(ctta(pK2tDz4SVGEbUeMYO)v9hf)Y0pQ9L5rnJRomhW1xTC2jT9Np(5zyeGPpu)zA1mmp9n5um1e5F3Z)IUwV(VUPdW2HJ(3)]] )

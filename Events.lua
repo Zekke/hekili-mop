@@ -21,7 +21,7 @@ local insert, remove, sort, wipe = table.insert, table.remove, table.sort, table
 
 -- MoP API compatibility
 local CGetItemInfo = ns.CachedGetItemInfo
-local IsEquippedItem = IsEquippedItem
+local IsEquippedItem = C_Item and C_Item.IsEquippedItemByID or IsEquippedItem
 local GetDetailedItemLevelInfo = function(itemLink) 
     local _, _, _, itemLevel = CGetItemInfo(itemLink)
     return itemLevel or 0

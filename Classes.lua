@@ -1972,6 +1972,78 @@ all:RegisterAuras({
         end
     },
 
+    stamina = {
+        id = 21562, -- Use Fortitude as primary ID
+        duration = 3600,
+        max_stack = 1,
+        generate = function( t )
+            -- Commanding Shout
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 469)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Power Word: Fortitude
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 21562)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Dark Intent
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 109773)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Qiraji Fortitude (Pet)
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 90364)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- No stamina buff found
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+            t.up = false
+            t.down = true
+            t.remains = 0
+        end
+    },
+
     out_of_range = {
         generate = function ( oor )
             oor.rangeSpell = rawget( oor, "rangeSpell" ) or settings.spec.rangeChecker or class.specs[ state.spec.id ].ranges[ 1 ]
