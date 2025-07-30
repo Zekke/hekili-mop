@@ -1473,30 +1473,6 @@ spec:RegisterAbilities( {
             t.caster = "nobody"
         end
     },
-
-    -- Art of War: Proc for instant and free Exorcism
-    art_of_war = {
-        id = 87138,
-        duration = 15,
-        max_stack = 1,
-        generate = function( t )
-            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID( "player", 87138 )
-
-            if name then
-                t.name = name
-                t.count = count
-                t.expires = expirationTime
-                t.applied = expirationTime - duration
-                t.caster = caster
-                return
-            end
-
-            t.count = 0
-            t.expires = 0
-            t.applied = 0
-            t.caster = "nobody"
-        end
-    },
 } )
 
 -- Retribution Paladin abilities
@@ -1559,7 +1535,7 @@ spec:RegisterAbilities( {
     },
 
     exorcism = {
-        id = function() return state.glyph.mass_exorcism.enabled and 122032 or 879 end,
+        id = 879,
         cast = 0,
 		cooldown = 15,
         gcd = "spell",
@@ -1573,6 +1549,8 @@ spec:RegisterAbilities( {
         startsCombat = true,
         texture = 135903,
 
+        copy = { 122032 },
+
         handler = function()
             -- Exorcism mechanic
             if state.buff.art_of_war.up then
@@ -1580,7 +1558,7 @@ spec:RegisterAbilities( {
             end
 
             gain(1, "holy_power")
-        end
+        end,
     },
 
     inquisition = {
@@ -2263,4 +2241,4 @@ spec:RegisterOptions( {
 } )
 
 -- Register default pack for MoP Retribution Paladin
-spec:RegisterPack( "Retribution", 20250720, [[Hekili:9M1xVTTnq8plfdWOPRttw2ojDiYpS9sBEOyyQpljgjABoR)nsQKAad9zFKuwwKuKsQPOfdRnL3X7(D)L3ffUm8lHbPakm8ZEUEBCVZZ1z5TEBwVkmGEQcggubsoc2Z(Hcqo7p)hifJEQMIkl40oLvcs5YGuwJty0dq5)fgSJ2eVz99)29HbpvJYOFQi8PH6zZ6nRVJD1kys4NVZnm4aknf2YkKKeg8Ldistm))bnXxastC5o2)oHJGM4meHYiVRe3e)r4rugYHblC5ougdm)st8FdYaPOI)Ojwc5np2EFItfgMuM)eG(R()(tzqcbvSpQCx0r2FtEpAN)BEQE3ohcfqjo1vlA)NDCYozArLJ2FG2lQCaHcXN(gegbcY4cIIRPhKWK8XCXXV7ZWiybmhbjpSECPH5WcwwtkyQFOuvipu6B9Ti(Qs7o4)ToDFoSG28i))UWX17WXWBV4rkltZQjuhmKX15ZThdksqSBhvv(ceZHu7Ppdl2ZD1VGbc)WnNptb49qQdfLdJOLrPi4d(RDVrwNOI)RgrqQkw6qN0YxkoFEWXyyoavqEW37MfV9qz2Pw4S1FLr12ZX78CViUu0ZOcyuvnUQKaBTrfSPAsC4nags5kSlSVgGtrGcEGRZlDndEI7kqOqJqmNDkiJDDh5JDGfawwA6IHEjwuO3e5ofzrxtGrikm)98wh(SQVIJq6sUsEgGrCr6C5WiYPIKiswj1F5ctkXugGuesLaRAn5O)YzagVjaJ3piWiYWJ2vJpPCketGyEGtjBaNak4juySO2PNc8RWer)SicJcSibkfahsC8W4RZOuSQmEpds0bqEUsUKY5)WrXLYlcZHLZbHEJlp56w)nJuu214rPwqjJNv2pUYLLDcUMaszIqi8fYGqweSC0QmaMe9mKvuNiE6WaGhfutjpRM8cZuA75TwPVHiAY74i6sjt6faI(EcmXpPSmJh9C0yUtICOmfpBDxmflp47649kJcMFdzw(VrVvpuPhG9VMAkHuXT29g580sNXWmvm6iC8GGgZgdcw4roiyHLbbb4xlXjiILAq1typp3gjWS2VueeVCtKxvYI9zNQoWhzIe1jUU(hMCAJB)DCz0W1jkBX60(oY3MvILPcttE2Xn3RomtMRorzZvN2aZ1kWLIERRsgDM0z1O220xBxpl4m5nB7zIVKKkp5J4WUuTWaMKjS70T8YYnHbVaWf8rScd(uEvjMYYiJ90wmXP5XWaXpjwZcUduNrz)4NfRD1j9)mmibZgnHnfsyWBBIfyxBg4M4ZNBI7iQpjCt8Iokd6weFt7DhoCAt8d(nXRDzSeg0IB2UtIzXdPmtDsmQpUCRIS56BvNNaqle2s)twnXBz0wncsv5(Dmb5kPoJvmYMLeE422kR2MHHs6LIQ3LlO1VobzDGDUm3yvMJmBENp1GAfKK9EDXHE8ilroeU1keSpSCtmtSl7tfnacZ5VAPogMXRv0TqU9xdr3Ye9MW1tyW)Uxl89(5cFVbW3Jd)75WVJq)QcYMeJRpOW11vh04APRmBQ7sOZQ9UstUtXuPFF)UoL81Harya2Bzn2Mi)KXUcgeW2E3i1NeB7s6zQ9j78nt2pu(jeT1hg0J4s)yvOl)ITa5t0(Z8iq6QIJ9r0H92HJ4aML5jv9PncHqX2BcoIpEHTiq3BGSxCNqV3jxXQTYJEj79AyKnbidOtSVuV05tnkBytDtMJRj2vyLtZk)zg2KJcC(Hz5lnKOyEQg7PlEUJRPreLPGHN9EIMQnxBkWPSaOqO27tnfg7wfriMvYjkARLPLO4PxPQMOyzNUzKOy5MMsuSYQuIIN9QD79c1PigRTp7rDNsX5JSxP8JmTue46wzF91OGMtwFUdvNS(AKZW7QFftU1H8i7p1BqmNcVrQUMxDSspXXlWwPmFYvxUQJDLEvOQJvFH1z4y1VIjh7qEKCSRMOgEWQWMZuN81GvVMHdSVc2wffQhEx9nSoJfrA0gM3gnA7CFTr6vAHCPfC9lkfAyrA(3neJQAVPXV9NS2FZfxv3N3t48EZ1nWV(D5KMZw)BekQkSAEDYQ)J(9TPcX3ou4cNuf6FoWzKVPCfUwSh(11I(Nh0O20Er04D5QDJClGl)ciuBamJUVICdaZqkXHbFeLdbIJc))]] )
+spec:RegisterPack( "Retribution", 20250720, [[Hekili:9M1xVTTnq8plfdWOPRtZw2UjDiYpS9sBEOyyQpljAjABUO)nsQKAad9zFKuwsKuKskPO9H2MY74D)U)Y7Icwf81a)eafg8f3LUBxER7DoRwU1D96aF65syGFji(rWr2pKdYy)9)aPy0(kkQiNt7CAbiHldsrfoMr3hL9xyWbAD02n39B3f4VVcLs)CEWEd6z9MvRyxTegh8LBxg4FcLKaByfsId8)6jePoI)hqD0vGuhvCG9)J5iOokfrOmYhkW1rFc(ikf5WGfU4akLbMFPo6VbPGeu(FuhjH86hyu0qA9d1p0ivItjggxKThq)vVFFFkKqq5hdloe(i7FjVhDW7n7RoCWHqbuItv5IM)BlNStMwuzOJNO9IkdqOq85xGWiqqkxquCf9KeMKpMlo(DFcgcZHzii5(nJlnmhwWIksot9dLQc5HsFNNfXxw042nr7FRsoMbZP8aqhhD3HJH3E1JuuKKwrOoyiJRlxAogKhJy3oSS4ziMdPMtFcMFK7QFgde(HBUCHcWhHuhkkdgslctqW792S8gzDIY)VkebPQyPdDskEo)YLbhJHzauo5Ep3Bw82tfPNBGZoV1gvBphVZD5vXLGEcLddlRWLfeyJnQGnvtIdVbWqkxHDHJvaCccKZdCTEPUm4jURaHcncXC2PGu21DKp2bMdyzPjlg6LyrHEtK7uKfDfbgIOWS3ZBO4XQjZFesxXvYtamIlsNRhgsoNhhsslOERwysjMYaKIqQeyvRXp6TAgGXDcW4(dcmIm8Wdv4ZkNcXeiMh4uYgWXGCEcfglQD6Pa)gmw0LlKWOaZJHsbWHehpm(6mkfRkL3ZGeEcKLPKlPC(pCuCT8IWCyzCqO34YvUU1B7ifLTnEuQfuY4zL9JRCzzhJRiGeMiecFHmiKfblhTmfGjHpbzf1XINoma4rb1uYZQjVWmLMEEBu6BiIM8ooIUuYKEgGOVNaJ9Ilks5rphnMBLihktXZULlMIL79w64(kJcMFdzw(VrVvpuPNG9VMAkHuXT2(g580sRXWmvm6r44bbnMngeSWJCqWcldccWVvGJrel1GQNWEEUjsGzTFPiiE12q3YyEE9X0ZLN4tnrcBLyBlet(TXDbTCz021jkB060(os5MvULPAtto3Xn3ohMjZvNOS5QtBG5Af4sbWnnbqTi9MxwVABdGTBZSGZK3SPTj(AEQ8WpIdBt1c8zsMWUt3wnSLyEgGZ5tzf4)5SYcmLLrg5QTXIt9db(IFsS)f8aOkLY(XVi2hRv6)zGFmMnDcBqKa)3whjWU2yW1rxUuh1suFy46OfTug0Wi6MM7oC(06O79QJ2SKXsGFdUzlvjghpGYm1jXO(eZnkYMRVrDUcaTqyl9VAvhTJrB9iivL73Xe0sj1zSIr2SKWd32wB12mmxsVuu9UCbT51jiRZSZL5wRYCKXZB9PguRGKS3Rno0JhzjYHWh0GqlFTJXldk7tqxhXu0Q(KtdWYCgTwYKHb)AeDJr08BSOdAm4F74W39faF3FUW3Ld)74WVfZ9BliBsmU(OcxDBpOX1QLYSPUoHoR27kn5AftL(997OuYxhceHbyVL1ylJ8tg7kyqaB7DJuFsSPlPRP2NSZ3oz)q5Nq02GyqpIR9JvHU8l2cKpr7pZJaPRko2hrh2BhoIdywMNuJbTriekwVjOzJtZhVWweO9nq2lUtO3BLRy126rVK9onmYMaKb0jwzQx68PgLnSPUjZXvhTuyLtZk)zg2KJcC(Xz5lnKOyEQg7PlUlhxtJiktbdx79envBUXuGtzhqHqT3NAkm2UkIqmRLtu02mtlrXvVsvnrXYADZirXYnnLOyLvPefx7v727fQtrmwBF2ZG1kfKgz1s53zAOiG2hKD3Dbcn)S(OhQ(z9njNHdw)kM8Sd5r2LQ3Jyo1EJuGnVszL2IJxJTwzeLoxUQJDTEHOQJvFN1z4y1VIjh7qEKCSRNOmEW2WMtwN8bH1VM5dSVf2offQhEx)c2OXIinAdZBPgT1U76L2rlGln)UVRuGHDPBV0E9VOxZNBeJkBOB(tgQ)9cLr6BU6wB)GGch9B6wyV7l5jktSAVTxO)BbAvogTfXNuu4tNuf6FLWzKaQCfUwSNpORf9VAOrTP9kPX7Yv7w5Ecx)LsO2rygTJfjlaMHuGd8)ekdcehf8)d]] )

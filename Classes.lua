@@ -2044,6 +2044,106 @@ all:RegisterAuras({
         end
     },
 
+    crit = {
+        id = 1459, -- Use Arcane Brilliance as primary ID
+        duration = 3600,
+        max_stack = 1,
+        generate = function( t )
+            -- Arcane Brilliance
+            local name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 1459)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Furious Howl (Pet)
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 24604)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Leader of the Pack
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 17007)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Legacy of the White Tiger
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 116781)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Terrifying Roar
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 112928)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- Still Water
+            name, icon, count, debuffType, duration, expirationTime, caster = FindUnitBuffByID("player", 126309)
+            if name then
+                t.name = name
+                t.count = 1
+                t.expires = expirationTime or 0
+                t.applied = (expirationTime and duration) and (expirationTime - duration) or 0
+                t.caster = caster
+                t.up = true
+                t.down = false
+                t.remains = expirationTime and (expirationTime - GetTime()) or 0
+                return
+            end
+
+            -- No mastery buff found
+            t.count = 0
+            t.expires = 0
+            t.applied = 0
+            t.caster = "nobody"
+            t.up = false
+            t.down = true
+            t.remains = 0
+        end
+    },
+
     out_of_range = {
         generate = function ( oor )
             oor.rangeSpell = rawget( oor, "rangeSpell" ) or settings.spec.rangeChecker or class.specs[ state.spec.id ].ranges[ 1 ]
