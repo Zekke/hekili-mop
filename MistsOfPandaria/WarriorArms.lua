@@ -682,8 +682,8 @@ spec:RegisterAuras( {
         max_stack = 1,
     },
     
-    victory_rush = {
-        id = 34428,
+    victorious = {
+        id = 32216,
         duration = 0,
         max_stack = 1,
     },
@@ -1087,6 +1087,54 @@ spec:RegisterAbilities( {
                 end
             end
         end,
+    },
+      victory_rush = {
+        id = 34428,
+        cast = 0,
+        cooldown = 0,
+        gcd = 1.5,
+        spend = 0,
+        spendtype = "rage",
+
+        startsCombat = true,
+        texture = 132342,
+
+        usable = function()
+            return buff.victorious.up
+        end
+    },
+      cleave = {
+        id = 845,
+        cast = 0,
+        cooldown = 1.5,
+        gcd = 0,
+        spend = 30,
+        spendtype = "rage",
+        
+        startsCombat = true,
+        texture = 132338,
+    },
+      whirlwind = {
+        id = 1680,
+        cast = 0,
+        cooldown = 0,
+        gcd = 1.5,
+        spend = 30,
+        spendtype = "rage",
+        
+        startsCombat = true,
+        texture = 132369,
+    },
+      recklessness = {
+        id = 1719,
+        cast = 0,
+        cooldown = 180,
+        gcd = 0,
+        spend = 0,
+        spendtype = "rage",
+        
+        startsCombat = false,
+        texture = 132109,
     },
       overpower = {
         id = 7384,

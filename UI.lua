@@ -1647,6 +1647,9 @@ if self.HasRecommendations then
                 self:SetAlpha( 0 )
                 self:Hide()
                 self.alpha = 0
+                if IsAddOnLoaded("ZTB_classic") then
+                    ZTB.PixelFrame:Hide();
+                end
                 return
             end
 
